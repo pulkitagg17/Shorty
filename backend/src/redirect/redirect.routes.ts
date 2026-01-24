@@ -27,7 +27,7 @@ export function registerRedirectRoutes(app: Express) {
                     return res.status(429).send('Too many requests');
                 }
             } catch {
-                // 🔥 FAIL OPEN — redirects must keep working
+                // FAIL OPEN — redirects must keep working
             }
 
             const longUrl = await service.resolve(code);
