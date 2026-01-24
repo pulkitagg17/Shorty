@@ -1,8 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { loginSchema } from "@/lib/auth";
+import { loginRequest, loginSchema } from "@/lib/auth";
 import { z } from "zod";
-
 import { Button } from "@/components/ui/button";
 import {
     Form,
@@ -13,10 +12,14 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/use-auth";
+import { useNavigate } from "react-router-dom";
 
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
+    const { login } = useAuth();
+    const navigate = useNavigate();
     const form = useForm<LoginForm>({
         resolver: zodResolver(loginSchema),
         defaultValues: {
@@ -25,8 +28,10 @@ export default function LoginPage() {
         },
     });
 
-    function onSubmit(values: LoginForm) {
-        console.log("LOGIN FORM:", values);
+    async function onSubmit(values: LoginForm) {
+        const res = await loginRequest(values);
+        login(res.token);
+        navigate("/dashboard");
     }
 
     return (

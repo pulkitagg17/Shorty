@@ -1,8 +1,8 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { registerSchema } from "@/lib/auth";
+import { registerRequest, registerSchema } from "@/lib/auth";
+import { useNavigate } from "react-router-dom";
 import { z } from "zod";
-
 import { Button } from "@/components/ui/button";
 import {
     Form,
@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 type RegisterForm = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
+    const navigate = useNavigate();
     const form = useForm<RegisterForm>({
         resolver: zodResolver(registerSchema),
         defaultValues: {
@@ -25,8 +26,9 @@ export default function RegisterPage() {
         },
     });
 
-    function onSubmit(values: RegisterForm) {
-        console.log("REGISTER FORM:", values);
+    async function onSubmit(values: RegisterForm) {
+        await registerRequest(values);
+        navigate("/login");
     }
 
     return (
