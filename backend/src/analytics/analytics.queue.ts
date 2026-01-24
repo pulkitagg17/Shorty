@@ -1,6 +1,6 @@
 import { Queue } from 'bullmq';
 import { redis } from '../infra/redis';
-import client from 'prom-client';
+import { Gauge } from 'prom-client';
 
 export const analyticsQueue = new Queue('analytics', {
     connection: redis,
@@ -10,7 +10,8 @@ export const analyticsQueue = new Queue('analytics', {
     }
 });
 
-export const analyticsQueueDepth = new client.Gauge({
+export const analyticsQueueDepth = new Gauge({
     name: 'analytics_queue_depth',
     help: 'Number of jobs waiting in analytics queue'
 });
+

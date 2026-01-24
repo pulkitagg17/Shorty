@@ -7,7 +7,14 @@ const repo = new AnalyticsRepository();
 export const analyticsWorker = new Worker(
     'analytics',
     async job => {
-        await repo.insert(job.data);
+        try {
+            await repo.insert(job.data);
+        } catch (err) {
+            console.error('ANALYTICS INSERT FAILED:', err);
+            // DO NOT throw — avoid retry storms
+        }
     },
-    { connection: redis }
+    {
+        connection: redis,
+    }
 );
