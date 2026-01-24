@@ -3,6 +3,7 @@ import { UrlRepository } from '../repositories/url.repository';
 import { validateUrl } from '../shared/url.validator';
 import { generateShortCode } from '../shared/short-code';
 import { redis } from '../infra/redis';
+import { normalizeCode } from '../shared/normalize';
 
 export class UrlService {
     private repo = new UrlRepository();
@@ -23,7 +24,9 @@ export class UrlService {
             shortCode,
             longUrl: url.toString(),
             userId: params.userId,
-            customAlias: params.customAlias?.toLowerCase()
+            customAlias: params.customAlias
+                ? normalizeCode(params.customAlias)
+                : undefined
         });
 
         // 🔥 CACHE WARMING (WRITE‑TIME ONLY)
@@ -48,5 +51,9 @@ export class UrlService {
             } catch { }
         }
         throw new Error('Short code collision');
+    }
+
+    async getUserUrls(userId: string) {
+        return this.repo.getUrlsByUserId(userId);
     }
 }

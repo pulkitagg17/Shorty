@@ -42,4 +42,14 @@ export function registerUrlRoutes(app: Express) {
             res.status(201).json(result);
         }
     );
+
+    app.get(
+        '/api/urls',
+        requireAuth,
+        async (req: AuthenticatedRequest, res: Response) => {
+            const userId = req.user!.userId;
+            const urls = await service.getUserUrls(userId);
+            res.json(urls);
+        }
+    );
 }

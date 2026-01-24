@@ -25,4 +25,45 @@ export class UrlRepository {
             ]
         );
     }
+
+    async getUrlsByUserId(userId: string) {
+        const result = await pool.query(
+            `
+            SELECT short_code, long_url, custom_alias, created_at
+            FROM urls
+            WHERE user_id = $1
+            ORDER BY created_at DESC
+            `,
+            [userId]
+        );
+
+        return result.rows.map(row => ({
+            shortCode: row.short_code,
+            longUrl: row.long_url,
+            customAlias: row.custom_alias,
+            createdAt: row.created_at
+        }));
+    }
+
+    async findByShortCode(shortCode: string) {
+        const result = await pool.query(
+            `SELECT id, short_code, long_url, user_id, custom_alias, expiry_at 
+             FROM urls 
+             WHERE short_code = $1
+             AND (expiry_at IS NULL OR expiry_at > NOW())`,
+            [shortCode]
+        );
+
+        if (result.rows.length === 0) return null;
+
+        const row = result.rows[0];
+        return {
+            id: row.id,
+            shortCode: row.short_code,
+            longUrl: row.long_url,
+            userId: row.user_id,
+            customAlias: row.custom_alias,
+            expiresAt: row.expiry_at
+        };
+    }
 }
