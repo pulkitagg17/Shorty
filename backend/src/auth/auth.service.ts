@@ -1,4 +1,4 @@
-import { v4 as uuid } from 'uuid';
+import { v4 as uuidv4 } from 'uuid';
 import { AuthRepository } from '../repositories/auth.repository';
 import { hashPassword, verifyPassword } from '../shared/password';
 import { signJwt } from '../shared/jwt';
@@ -8,7 +8,7 @@ export class AuthService {
 
     async register(email: string, password: string) {
         const passwordHash = await hashPassword(password);
-        const userId = uuid();
+        const userId = uuidv4();
 
         await this.repo.createUser(userId, email, passwordHash);
         return { userId };

@@ -1,8 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyJwt } from '../shared/jwt';
 
+export interface AuthenticatedRequest extends Request {
+    user?: {
+        userId: string;
+    };
+}
+
 export function requireAuth(
-    req: Request,
+    req: AuthenticatedRequest,
     res: Response,
     next: NextFunction
 ) {
@@ -12,8 +18,16 @@ export function requireAuth(
     }
 
     const token = header.replace('Bearer ', '');
+
     try {
-        verifyJwt(token);
+        const payload = verifyJwt(token) as { userId: string };
+
+        if (!payload?.userId) {
+            return res.status(401).json({ error: 'Invalid token' });
+        }
+
+        req.user = { userId: payload.userId };
+
         next();
     } catch {
         return res.status(401).json({ error: 'Invalid token' });
