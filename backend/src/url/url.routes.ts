@@ -1,6 +1,7 @@
 import { Express, Response } from 'express';
 import { UrlService } from './url.service';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';
+import { checkRateLimit } from '../rate-limit/rate-limiter';
 
 const service = new UrlService();
 
@@ -16,6 +17,21 @@ export function registerUrlRoutes(app: Express) {
             }
 
             const userId = req.user!.userId;
+
+            try {
+                const allowed = await checkRateLimit(
+                    `ratelimit:create:${userId}`,
+                    10,
+                    60
+                );
+
+                if (!allowed) {
+                    return res.status(429).json({ error: 'Rate limit exceeded' });
+                }
+            } catch {
+                // 🔥 FAIL CLOSED — block writes if Redis is unhealthy
+                return res.status(503).json({ error: 'Service unavailable' });
+            }
 
             const result = await service.createUrl({
                 longUrl,
