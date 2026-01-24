@@ -11,7 +11,7 @@ export function registerAnalyticsRoutes(app: Express) {
         requireAuth,
         async (req: AuthenticatedRequest, res: Response) => {
             const userId = req.user!.userId;
-            const code = normalizeCode(req.params.code);
+            const code = normalizeCode(req.params.code as string);
             await service.getStats(res, code, userId);
         }
     );
