@@ -1,5 +1,6 @@
 import { redis } from '../infra/redis';
 import { RedirectRepository } from '../repositories/redirect.repository';
+import { cacheHits, cacheMisses } from '../metrics/metrics';
 
 export class RedirectService {
     private repo = new RedirectRepository();
@@ -8,18 +9,21 @@ export class RedirectService {
         // 1️⃣ Try custom alias cache
         const aliasCache = await redis.get(`alias:${code}`);
         if (aliasCache) {
+            cacheHits.inc();
             return JSON.parse(aliasCache).longUrl;
         }
 
         // 2️⃣ Try short code cache
         const shortCache = await redis.get(`short:${code}`);
         if (shortCache) {
+            cacheHits.inc();
             return JSON.parse(shortCache).longUrl;
         }
 
         // 3️⃣ DB fallback: custom alias
         const aliasRow = await this.repo.findByCustomAlias(code);
         if (aliasRow) {
+            cacheMisses.inc();
             await this.warmCache(`alias:${code}`, aliasRow);
             return aliasRow.long_url;
         }
@@ -27,6 +31,7 @@ export class RedirectService {
         // 4️⃣ DB fallback: short code
         const shortRow = await this.repo.findByShortCode(code);
         if (shortRow) {
+            cacheMisses.inc();
             await this.warmCache(`short:${code}`, shortRow);
             return shortRow.long_url;
         }
