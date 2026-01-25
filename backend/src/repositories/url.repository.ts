@@ -1,4 +1,5 @@
 import { pool } from '../infra/database';
+import { ConflictError } from '../shared/errors';
 
 export class UrlRepository {
     async insertUrl(data: {
@@ -10,21 +11,29 @@ export class UrlRepository {
         createdAt: Date;
         expiresAt?: Date | null;
     }) {
-        await pool.query(
-            `
+        try {
+            await pool.query(
+                `
       INSERT INTO urls
         (id, short_code, long_url, user_id, custom_alias, expiry_at)
       VALUES ($1, $2, $3, $4, $5, $6)
       `,
-            [
-                data.id,
-                data.shortCode,
-                data.longUrl,
-                data.userId,
-                data.customAlias ?? null,
-                data.expiresAt ?? null
-            ]
-        );
+                [
+                    data.id,
+                    data.shortCode,
+                    data.longUrl,
+                    data.userId,
+                    data.customAlias ?? null,
+                    data.expiresAt ?? null
+                ]
+            );
+        }
+        catch (err: any) {
+            if (err.code === '23505') {
+                throw new ConflictError('Alias already in use');
+            }
+            throw err;
+        }
     }
 
     async getUrlsByUserId(userId: string) {
@@ -68,6 +77,43 @@ export class UrlRepository {
             expiresAt: row.expiry_at
         };
     }
+
+    async findOwnedByCode(code: string, userId: string) {
+        const result = await pool.query(
+            `
+                SELECT
+                id,
+                short_code,
+                long_url,
+                custom_alias,
+                created_at,
+                expiry_at,
+                user_id
+                FROM urls
+                WHERE (short_code = $1 OR custom_alias = $1)
+                AND user_id = $2
+                AND (expiry_at IS NULL OR expiry_at > NOW())
+            `,
+            [code, userId]
+        );
+
+        if (result.rows.length === 0) {
+            return null;
+        }
+
+        const row = result.rows[0];
+
+        return {
+            id: row.id,
+            shortCode: row.short_code,
+            longUrl: row.long_url,
+            customAlias: row.custom_alias,
+            createdAt: row.created_at,
+            expiresAt: row.expiry_at,
+            userId: row.user_id
+        };
+    }
+
 
     async updateUrlById(
         id: string,

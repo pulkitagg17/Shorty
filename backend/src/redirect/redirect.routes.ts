@@ -2,8 +2,7 @@ import { Express, Request, Response } from 'express';
 import { RedirectService } from './redirect.service';
 import { checkRateLimit } from '../rate-limit/rate-limiter';
 import { emitAnalyticsEvent } from '../analytics/analytics.producer';
-import { redirectLatency, redirectErrors } from '../metrics/metrics';
-import { normalizeCode } from '../shared/normalize';
+import { redirectLatency, redirectErrors } from '../metrics/metrics'
 
 const service = new RedirectService();
 
@@ -11,9 +10,7 @@ export function registerRedirectRoutes(app: Express) {
     app.get('/:code', async (req: Request, res: Response) => {
         const end = redirectLatency.startTimer();
         try {
-            const rawCode = req.params.code;
-            const code = normalizeCode(Array.isArray(rawCode) ? rawCode[0] : rawCode);
-
+            const code = req.params.code as string;
             const ip = req.ip;
 
             try {

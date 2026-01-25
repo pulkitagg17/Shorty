@@ -1,30 +1,26 @@
-const BLOCKED_HOSTS = [
-    'localhost',
-    '127.0.0.1',
-    '0.0.0.0',
-    'metadata.google.internal'
-];
+import { ValidationError } from "./errors";
+
+const MAX_URL_LENGTH = 2048
 
 export function validateUrl(raw: string): URL {
-    let url: URL;
+    if (!raw) {
+        throw new ValidationError("longUrl required");
+    }
 
+    let parsed: URL;
     try {
-        url = new URL(raw);
+        parsed = new URL(raw);
     } catch {
-        throw new Error('Invalid URL');
+        throw new ValidationError('Invalid URL');
     }
 
-    if (!['http:', 'https:'].includes(url.protocol)) {
-        throw new Error('Invalid protocol');
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+        throw new ValidationError('Invalid URL protocol');
     }
 
-    if (BLOCKED_HOSTS.includes(url.hostname)) {
-        throw new Error('Blocked host');
+    if (raw.length > MAX_URL_LENGTH) {
+        throw new ValidationError('URL too long');
     }
 
-    if (raw.length > 2000) {
-        throw new Error('URL too long');
-    }
-
-    return url;
+    return parsed;
 }

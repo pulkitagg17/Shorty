@@ -74,8 +74,7 @@ export function registerUrlRoutes(app: Express) {
         requireAuth,
         async (req: AuthenticatedRequest, res: Response) => {
             const userId = req.user!.userId;
-            const rawCode = req.params.code;
-            const code = Array.isArray(rawCode) ? rawCode[0] : rawCode;
+            const code = req.params.code as string;
 
             const { longUrl, expiresAt } = req.body as {
                 longUrl?: string;

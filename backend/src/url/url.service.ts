@@ -3,7 +3,6 @@ import { UrlRepository } from '../repositories/url.repository';
 import { validateUrl } from '../shared/url.validator';
 import { generateShortCode } from '../shared/short-code';
 import { redis } from '../infra/redis';
-import { normalizeCode } from '../shared/normalize';
 
 export class UrlService {
     private repo = new UrlRepository();
@@ -14,9 +13,7 @@ export class UrlService {
         customAlias?: string;
     }) {
         const url = validateUrl(params.longUrl);
-
         const shortCode = await this.generateUniqueCode();
-
         const id = uuidv4();
 
         await this.repo.insertUrl({
@@ -25,9 +22,7 @@ export class UrlService {
             longUrl: url.toString(),
             createdAt: new Date(),
             userId: params.userId,
-            customAlias: params.customAlias
-                ? normalizeCode(params.customAlias)
-                : undefined
+            customAlias: params.customAlias ?? undefined
         });
 
         // 🔥 CACHE WARMING (WRITE‑TIME ONLY)
@@ -59,33 +54,22 @@ export class UrlService {
     }
 
     async getUrlByCode(code: string, userId: string) {
-        const normalized = normalizeCode(code);
-        const url = await this.repo.findByShortCode(normalized);
+        const url = await this.repo.findOwnedByCode(
+            code,
+            userId
+        );
 
-        const owned = this.assertOwnership(url, userId);
-        if (!owned) return null;
+        if (!url) {
+            return null;
+        }
 
         return {
-            shortCode: owned.shortCode,
-            longUrl: owned.longUrl,
-            customAlias: owned.customAlias,
-            createdAt: owned.createdAt,
-            expiresAt: owned.expiresAt
+            shortCode: url.shortCode,
+            longUrl: url.longUrl,
+            customAlias: url.customAlias,
+            createdAt: url.createdAt,
+            expiresAt: url.expiresAt
         };
-    }
-
-    private assertOwnership(url: any, userId: string) {
-        if (!url) return null;
-
-        if (url.userId !== userId) {
-            return null;
-        }
-
-        if (url.expiresAt && url.expiresAt < new Date()) {
-            return null;
-        }
-
-        return url;
     }
 
     async updateUrl(
@@ -96,50 +80,47 @@ export class UrlService {
             expiresAt?: Date | null;
         }
     ) {
-        const normalized = normalizeCode(code);
-        const url = await this.repo.findByShortCode(normalized);
-
-        const owned = this.assertOwnership(url, userId);
-        if (!owned) return null;
+        const url = await this.repo.findOwnedByCode(code, userId);
+        if (!url) return null;
 
         let nextLongUrl: string | undefined;
-        if (params.longUrl) {
+        if (params.longUrl !== undefined) {
             const validated = validateUrl(params.longUrl);
             nextLongUrl = validated.toString();
         }
 
-        await this.repo.updateUrlById(owned.id, {
+        await this.repo.updateUrlById(url.id, {
             longUrl: nextLongUrl,
-            expiresAt: params.expiresAt ?? owned.expiresAt ?? null
+            expiresAt:
+                params.expiresAt !== undefined
+                    ? params.expiresAt
+                    : url.expiresAt ?? null
         });
 
-        await redis.del(`short:${owned.shortCode}`);
-        if (owned.customAlias) {
-            await redis.del(`alias:${owned.customAlias}`);
+        await redis.del(`short:${url.shortCode}`);
+        if (url.customAlias) {
+            await redis.del(`alias:${url.customAlias}`);
         }
 
         return {
-            shortCode: owned.shortCode,
-            longUrl: nextLongUrl ?? owned.longUrl,
-            customAlias: owned.customAlias,
-            expiresAt: params.expiresAt ?? owned.expiresAt ?? null
+            shortCode: url.shortCode,
+            longUrl: nextLongUrl ?? url.longUrl,
+            customAlias: url.customAlias,
+            expiresAt: params.expiresAt ?? url.expiresAt ?? null
         };
     }
 
     async deleteUrl(code: string, userId: string): Promise<boolean> {
-        const normalized = normalizeCode(code);
-        const url = await this.repo.findByShortCode(normalized);
-
-        const owned = this.assertOwnership(url, userId);
-        if (!owned) return false;
+        const url = await this.repo.findOwnedByCode(code, userId);
+        if (!url) return false;
 
         // Delete DB record
-        await this.repo.deleteById(owned.id);
+        await this.repo.deleteById(url.id);
 
         // Invalidate cache (both possible keys)
-        await redis.del(`short:${owned.shortCode}`);
-        if (owned.customAlias) {
-            await redis.del(`alias:${owned.customAlias}`);
+        await redis.del(`short:${url.shortCode}`);
+        if (url.customAlias) {
+            await redis.del(`alias:${url.customAlias}`);
         }
 
         return true;
