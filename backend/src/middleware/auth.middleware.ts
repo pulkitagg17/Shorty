@@ -1,32 +1,47 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyJwt } from '../shared/jwt';
+import { AuthRepository } from '../repositories/auth.repository';
 
 export interface AuthenticatedRequest extends Request {
     user?: {
         userId: string;
+        sessionId: string;
     };
 }
 
-export function requireAuth(
+const authRepo = new AuthRepository();
+
+export async function requireAuth(
     req: AuthenticatedRequest,
     res: Response,
     next: NextFunction
 ) {
-    const header = req.headers.authorization;
-    if (!header) {
+    const token = req.cookies?.auth_token;
+
+    if (!token) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const token = header.replace('Bearer ', '');
-
     try {
-        const payload = verifyJwt(token) as { userId: string };
+        const payload = verifyJwt(token) as {
+            userId: string;
+            sessionId: string;
+        };
 
-        if (!payload?.userId) {
+        if (!payload?.userId || !payload?.sessionId) {
             return res.status(401).json({ error: 'Invalid token' });
         }
 
-        req.user = { userId: payload.userId };
+        const session = await authRepo.findSessionById(payload.sessionId);
+
+        if (!session || session.user_id !== payload.userId) {
+            return res.status(401).json({ error: 'Session expired' });
+        }
+
+        req.user = {
+            userId: payload.userId,
+            sessionId: payload.sessionId
+        };
 
         next();
     } catch {

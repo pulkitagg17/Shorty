@@ -2,8 +2,17 @@ import { Express, Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { checkLoginRateLimit } from './login-rate-limit';
 import { RegisterBody, LoginBody } from './auth.types';
+import { authConfig } from '../config/auth';
+import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';
 
 const service = new AuthService();
+
+const cookieOptions = {
+    httpOnly: true,
+    secure: authConfig.cookieSecure, // true in prod
+    sameSite: 'lax' as const,
+    maxAge: authConfig.jwtExpiresInSeconds * 1000
+};
 
 export function registerAuthRoutes(app: Express) {
     app.post(
@@ -15,15 +24,17 @@ export function registerAuthRoutes(app: Express) {
                 return res.status(400).json({ error: 'Email and password required' });
             }
 
-            const result = await service.register(email, password);
-            res.status(201).json(result);
+            const { token } = await service.register(email, password);
+
+            res.cookie('auth_token', token, cookieOptions);
+            res.status(201).json({ success: true });
         }
     );
 
     app.post(
         '/auth/login',
         async (req: Request<{}, {}, LoginBody>, res: Response) => {
-            const ip = req.ip ?? 'unknown'; // ✅ FIXED (see Problem 3)
+            const ip = req.ip ?? 'unknown';
 
             const allowed = await checkLoginRateLimit(ip);
             if (!allowed) {
@@ -36,8 +47,24 @@ export function registerAuthRoutes(app: Express) {
                 return res.status(400).json({ error: 'Email and password required' });
             }
 
-            const result = await service.login(email, password);
-            res.status(200).json(result);
+            try {
+                const { token } = await service.login(email, password);
+
+                res.cookie('auth_token', token, cookieOptions);
+                res.status(200).json({ success: true });
+            } catch {
+                res.status(401).json({ error: 'Invalid credentials' });
+            }
+        }
+    );
+
+    app.get(
+        '/auth/me',
+        requireAuth,
+        async (req: AuthenticatedRequest, res: Response) => {
+            res.json({
+                userId: req.user!.userId,
+            });
         }
     );
 }

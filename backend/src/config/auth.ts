@@ -1,4 +1,15 @@
+import { env } from './env';
+
 export const authConfig = {
-    jwtSecret: process.env.JWT_SECRET || 'dev-secret',
-    jwtExpiresInSeconds: 15 * 60 // 15 minutes
+    // JWT
+    jwtSecret: env.JWT_SECRET,
+    jwtExpiresInSeconds: Number(env.JWT_EXPIRES_IN_SECONDS ?? 900), // 15 min
+
+    // Sessions (server-side)
+    sessionExpiresInSeconds: Number(
+        env.SESSION_EXPIRES_IN_SECONDS ?? 60 * 60 * 24 * 7 // 7 days
+    ),
+
+    // Cookies
+    cookieSecure: env.NODE_ENV === 'production'
 };

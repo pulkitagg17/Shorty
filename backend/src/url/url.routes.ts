@@ -29,7 +29,6 @@ export function registerUrlRoutes(app: Express) {
                     return res.status(429).json({ error: 'Rate limit exceeded' });
                 }
             } catch {
-                // 🔥 FAIL CLOSED — block writes if Redis is unhealthy
                 return res.status(503).json({ error: 'Service unavailable' });
             }
 
@@ -52,4 +51,22 @@ export function registerUrlRoutes(app: Express) {
             res.json(urls);
         }
     );
+
+    app.get(
+        '/api/urls/:code',
+        requireAuth,
+        async (req: AuthenticatedRequest, res: Response) => {
+            const userId = req.user!.userId;
+            const code = req.params.code as string;
+
+            const url = await service.getUrlByCode(code, userId);
+
+            if (!url) {
+                return res.status(404).json({ error: 'Not found' });
+            }
+
+            res.json(url);
+        }
+    );
+
 }

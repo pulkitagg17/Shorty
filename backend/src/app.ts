@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 
 export function createApp() {
@@ -7,6 +8,7 @@ export function createApp() {
 
     app.use(cors());
     app.use(express.json());
+    app.use(cookieParser());
 
     registerRoutes(app);
 

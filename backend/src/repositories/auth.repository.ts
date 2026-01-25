@@ -3,8 +3,7 @@ import { pool } from '../infra/database';
 export class AuthRepository {
     async createUser(id: string, email: string, passwordHash: string) {
         await pool.query(
-            `INSERT INTO users (id, email, password_hash)
-       VALUES ($1, $2, $3)`,
+            `INSERT INTO users (id, email, password_hash) VALUES ($1, $2, $3)`,
             [id, email, passwordHash]
         );
     }
@@ -14,19 +13,34 @@ export class AuthRepository {
             `SELECT * FROM users WHERE email = $1`,
             [email]
         );
-        return result.rows[0] || null;
+        return result.rows[0] ?? null;
     }
 
-    async createSession(
-        id: string,
-        userId: string,
-        tokenHash: string,
-        expiresAt: Date
-    ) {
+    async createSession(sessionId: string, userId: string, expiresAt: Date) {
         await pool.query(
-            `INSERT INTO auth_sessions (id, user_id, token_hash, expires_at)
-       VALUES ($1, $2, $3, $4)`,
-            [id, userId, tokenHash, expiresAt]
+            `
+      INSERT INTO auth_sessions (id, user_id, expires_at)
+      VALUES ($1, $2, $3)
+      `,
+            [sessionId, userId, expiresAt]
+        );
+    }
+
+    async findSessionById(sessionId: string) {
+        const result = await pool.query(
+            `
+      SELECT * FROM auth_sessions
+      WHERE id = $1 AND expires_at > NOW()
+      `,
+            [sessionId]
+        );
+        return result.rows[0] ?? null;
+    }
+
+    async deleteSession(sessionId: string) {
+        await pool.query(
+            `DELETE FROM auth_sessions WHERE id = $1`,
+            [sessionId]
         );
     }
 }

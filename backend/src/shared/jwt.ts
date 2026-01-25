@@ -1,12 +1,15 @@
-import jwt, { SignOptions } from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import { authConfig } from '../config/auth';
 
-export function signJwt(payload: object): string {
-    const options: SignOptions = {
-        expiresIn: authConfig.jwtExpiresInSeconds
-    };
+export interface JwtPayload {
+    userId: string;
+    sessionId: string;
+}
 
-    return jwt.sign(payload, authConfig.jwtSecret, options);
+export function signJwt(payload: JwtPayload): string {
+    return jwt.sign(payload, authConfig.jwtSecret, {
+        expiresIn: authConfig.jwtExpiresInSeconds
+    });
 }
 
 export function verifyJwt(token: string): any {

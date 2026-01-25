@@ -23,6 +23,7 @@ export class UrlService {
             id,
             shortCode,
             longUrl: url.toString(),
+            createdAt: new Date(),
             userId: params.userId,
             customAlias: params.customAlias
                 ? normalizeCode(params.customAlias)
@@ -55,5 +56,35 @@ export class UrlService {
 
     async getUserUrls(userId: string) {
         return this.repo.getUrlsByUserId(userId);
+    }
+
+    async getUrlByCode(code: string, userId: string) {
+        const normalized = normalizeCode(code);
+        const url = await this.repo.findByShortCode(normalized);
+
+        const owned = this.assertOwnership(url, userId);
+        if (!owned) return null;
+
+        return {
+            shortCode: owned.shortCode,
+            longUrl: owned.longUrl,
+            customAlias: owned.customAlias,
+            createdAt: owned.createdAt,
+            expiresAt: owned.expiresAt
+        };
+    }
+
+    private assertOwnership(url: any, userId: string) {
+        if (!url) return null;
+
+        if (url.userId !== userId) {
+            return null;
+        }
+
+        if (url.expiresAt && url.expiresAt < new Date()) {
+            return null;
+        }
+
+        return url;
     }
 }

@@ -7,6 +7,7 @@ export class UrlRepository {
         longUrl: string;
         userId: string;
         customAlias?: string | null;
+        createdAt: Date;
         expiresAt?: Date | null;
     }) {
         await pool.query(
@@ -63,6 +64,7 @@ export class UrlRepository {
             longUrl: row.long_url,
             userId: row.user_id,
             customAlias: row.custom_alias,
+            createdAt: row.created_at,
             expiresAt: row.expiry_at
         };
     }
