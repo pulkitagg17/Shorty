@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyJwt } from '../shared/jwt';
+import { verifyJwt, JwtPayload } from '../shared/jwt';
 import { AuthRepository } from '../repositories/auth.repository';
+import { AuthError } from '../shared/errors';
 
 export interface AuthenticatedRequest extends Request {
     user?: {
@@ -16,35 +17,33 @@ export async function requireAuth(
     res: Response,
     next: NextFunction
 ) {
-    const token = req.cookies?.auth_token;
+    const token = req.cookies?.auth;
 
     if (!token) {
-        return res.status(401).json({ error: 'Unauthorized' });
+        throw new AuthError('No authentication token provided');
     }
 
+    let payload: JwtPayload;
     try {
-        const payload = verifyJwt(token) as {
-            userId: string;
-            sessionId: string;
-        };
-
-        if (!payload?.userId || !payload?.sessionId) {
-            return res.status(401).json({ error: 'Invalid token' });
-        }
-
-        const session = await authRepo.findSessionById(payload.sessionId);
-
-        if (!session || session.user_id !== payload.userId) {
-            return res.status(401).json({ error: 'Session expired' });
-        }
-
-        req.user = {
-            userId: payload.userId,
-            sessionId: payload.sessionId
-        };
-
-        next();
-    } catch {
-        return res.status(401).json({ error: 'Invalid token' });
+        payload = verifyJwt(token);
+    } catch (err) {
+        throw err;
     }
+
+    const session = await authRepo.findSessionById(payload.sessionId);
+    if (!session) {
+        throw new AuthError('Session invalid or revoked');
+    }
+
+    if (new Date(session.expires_at) < new Date()) {
+        await authRepo.deleteSession(payload.sessionId);
+        throw new AuthError('Session expired');
+    }
+
+    req.user = {
+        userId: payload.userId,
+        sessionId: payload.sessionId
+    }
+
+    next();
 }

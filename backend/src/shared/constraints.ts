@@ -1,0 +1,5 @@
+export const AUTH_CONSTRAINTS = {
+    EMAIL_MAX_LENGTH: 254, // RFC‑safe
+    PASSWORD_MIN_LENGTH: 8,
+    PASSWORD_MAX_LENGTH: 72 // bcrypt safe max
+};

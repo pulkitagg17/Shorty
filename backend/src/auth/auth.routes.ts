@@ -1,70 +1,86 @@
 import { Express, Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { checkLoginRateLimit } from './login-rate-limit';
-import { RegisterBody, LoginBody } from './auth.types';
-import { authConfig } from '../config/auth';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.middleware';
+import { registerSchema, loginSchema } from './auth.validation';
+import { validateBody, rateLimitRegister } from '../middleware/validation.middleware';
+import { successResponse } from '../shared/response';
+import { authConfig } from '../config/auth';
+import { getCookieOptions } from '../config/auth';
+import z from 'zod'
 
 const service = new AuthService();
 
-const cookieOptions = {
-    httpOnly: true,
-    secure: authConfig.cookieSecure, // true in prod
-    sameSite: 'lax' as const,
-    maxAge: authConfig.jwtExpiresInSeconds * 1000
+const secureHeaders = {
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'X-XSS-Protection': '1; mode=block',
 };
 
 export function registerAuthRoutes(app: Express) {
     app.post(
         '/auth/register',
-        async (req: Request<{}, {}, RegisterBody>, res: Response) => {
-            const { email, password } = req.body;
-
-            if (!email || !password) {
-                return res.status(400).json({ error: 'Email and password required' });
-            }
+        rateLimitRegister(),
+        validateBody(registerSchema),
+        async (req: Request, res: Response) => {
+            const { email, password } = req.body as z.infer<typeof registerSchema>;
 
             const { token } = await service.register(email, password);
 
-            res.cookie('auth_token', token, cookieOptions);
-            res.status(201).json({ success: true });
+            res
+                .cookie('auth', token, getCookieOptions())
+                .set(secureHeaders)
+                .status(201)
+                .json({ success: true, message: 'Account created successfully' });
         }
     );
 
     app.post(
         '/auth/login',
-        async (req: Request<{}, {}, LoginBody>, res: Response) => {
-            const ip = req.ip ?? 'unknown';
+        validateBody(loginSchema),
+        async (req: Request, res: Response) => {
+            const ip = req.ip || 'unknown';
 
             const allowed = await checkLoginRateLimit(ip);
             if (!allowed) {
-                return res.status(429).json({ error: 'Too many attempts' });
+                return res.status(429).json({
+                    success: false,
+                    error: 'Too many login attempts. Try again later.',
+                });
             }
 
-            const { email, password } = req.body;
+            const { email, password } = req.body as z.infer<typeof loginSchema>;
 
-            if (!email || !password) {
-                return res.status(400).json({ error: 'Email and password required' });
-            }
+            const { token } = await service.login(email, password);
 
-            try {
-                const { token } = await service.login(email, password);
-
-                res.cookie('auth_token', token, cookieOptions);
-                res.status(200).json({ success: true });
-            } catch {
-                res.status(401).json({ error: 'Invalid credentials' });
-            }
+            res
+                .cookie('auth', token, getCookieOptions())
+                .set(secureHeaders)
+                .status(200)
+                .json({ success: true });
         }
     );
 
     app.get(
         '/auth/me',
         requireAuth,
+        (req: AuthenticatedRequest, res: Response) => {
+            successResponse(res, { userId: req.user!.userId });
+        }
+    );
+
+    app.post(
+        '/auth/logout',
+        requireAuth,
         async (req: AuthenticatedRequest, res: Response) => {
-            res.json({
-                userId: req.user!.userId,
-            });
+            const sessionId = req.user!.sessionId;
+            await service.logout(sessionId);
+
+            res
+                .clearCookie('auth', getCookieOptions())
+                .set(secureHeaders)
+                .status(200)
+                .json({ success: true, message: 'Logged out successfully' });
         }
     );
 }
