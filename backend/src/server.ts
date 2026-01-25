@@ -2,8 +2,8 @@ import http from 'http';
 import { createApp } from './app';
 import { env } from './config/env';
 import { pool } from './infra/database';
-import { redis } from './infra/redis';
-import { analyticsWorker } from './analytics/analytics.worker';
+import { redisClient } from './infra/redis.client';
+import { analyticsWorker, closeAnalyticsWorker } from './analytics/analytics.worker';
 import './analytics/queue.monitor';
 
 const app = createApp();
@@ -23,22 +23,43 @@ async function shutdown(signal: string) {
 
     console.log(`🛑 ${signal} received. Shutting down...`);
 
+    const FORCE_EXIT_TIMEOUT = 30000; // 30 seconds max
     const forceExit = setTimeout(() => {
-        console.error('❌ Forced shutdown');
+        console.error('❌ Shutdown timeout exceeded – forcing exit');
         process.exit(1);
-    }, 10_000);
+    }, FORCE_EXIT_TIMEOUT);
 
     try {
-        server.close();                 // stop new requests
-        await analyticsWorker.close();  // stop worker
-        await redis.quit();             // close redis
-        await pool.end();               // close postgres
+        // 1. Stop accepting new HTTP requests
+        server.close(() => {
+            console.log('→ HTTP server closed (no new connections)');
+        });
+
+        // 2. Close analytics worker with generous timeout
+        await closeAnalyticsWorker(15000);
+
+        // 3. Close Redis (best effort)
+        try {
+            await redisClient.quit();
+            console.log('→ Redis connection closed');
+        } catch (err: any) {
+            console.log('→ Redis quit failed (non-critical):', err.message);
+        }
+
+        // 4. Close PostgreSQL pool
+        try {
+            await pool.end();
+            console.log('→ PostgreSQL pool ended');
+        } catch (err: any) {
+            console.log('→ PostgreSQL pool close failed:', err.message);
+        }
 
         clearTimeout(forceExit);
         console.log('✅ Graceful shutdown complete');
         process.exit(0);
     } catch (err) {
         console.error('❌ Shutdown error', err);
+        clearTimeout(forceExit);
         process.exit(1);
     }
 }

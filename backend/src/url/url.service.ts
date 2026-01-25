@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { UrlRepository } from '../repositories/url.repository';
 import { validateUrl } from '../shared/url.validator';
 import { generateShortCode } from '../shared/short-code';
-import { redis } from '../infra/redis';
+import { redisCache } from '../infra/redis.cache';
 
 export class UrlService {
     private repo = new UrlRepository();
@@ -26,11 +26,10 @@ export class UrlService {
         });
 
         // 🔥 CACHE WARMING (WRITE‑TIME ONLY)
-        await redis.set(
+        await redisCache.set(
             `short:${shortCode}`,
-            JSON.stringify({ longUrl: url.toString() }),
-            'EX',
-            86400
+            { longUrl: url.toString() },
+            { ex: 86400 }
         );
 
         return {
@@ -97,9 +96,9 @@ export class UrlService {
                     : url.expiresAt ?? null
         });
 
-        await redis.del(`short:${url.shortCode}`);
+        await redisCache.del(`short:${url.shortCode}`);
         if (url.customAlias) {
-            await redis.del(`alias:${url.customAlias}`);
+            await redisCache.del(`alias:${url.customAlias}`);
         }
 
         return {
@@ -118,9 +117,9 @@ export class UrlService {
         await this.repo.deleteById(url.id);
 
         // Invalidate cache (both possible keys)
-        await redis.del(`short:${url.shortCode}`);
+        await redisCache.del(`short:${url.shortCode}`);
         if (url.customAlias) {
-            await redis.del(`alias:${url.customAlias}`);
+            await redisCache.del(`alias:${url.customAlias}`);
         }
 
         return true;

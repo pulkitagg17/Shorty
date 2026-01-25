@@ -1,4 +1,4 @@
-import { redis } from '../infra/redis';
+import { redisCache } from '../infra/redis.cache';
 import { RedirectRepository } from '../repositories/redirect.repository';
 import { cacheHits, cacheMisses } from '../metrics/metrics';
 
@@ -6,21 +6,36 @@ export class RedirectService {
     private repo = new RedirectRepository();
 
     async resolve(code: string): Promise<string | null> {
-        // 1️⃣ Try custom alias cache
-        const aliasCache = await redis.get(`alias:${code}`);
+        // 1. Try custom alias cache
+        const aliasCache = await redisCache.get(`alias:${code}`);
         if (aliasCache) {
-            cacheHits.inc();
-            return JSON.parse(aliasCache).longUrl;
+            try {
+                const parsed = JSON.parse(aliasCache) as { longUrl: string; expiresAt?: string | null };
+                if (parsed?.longUrl) {
+                    // Optional: check expiry here if you want strict cache enforcement
+                    cacheHits.inc();
+                    return parsed.longUrl;
+                }
+            } catch {
+                // corrupt/invalid JSON → treat as miss (silent)
+            }
         }
 
-        // 2️⃣ Try short code cache
-        const shortCache = await redis.get(`short:${code}`);
+        // 2. Try short code cache
+        const shortCache = await redisCache.get(`short:${code}`);
         if (shortCache) {
-            cacheHits.inc();
-            return JSON.parse(shortCache).longUrl;
+            try {
+                const parsed = JSON.parse(shortCache) as { longUrl: string; expiresAt?: string | null };
+                if (parsed?.longUrl) {
+                    cacheHits.inc();
+                    return parsed.longUrl;
+                }
+            } catch {
+                // corrupt → miss
+            }
         }
 
-        // 3️⃣ DB fallback: custom alias
+        // 3. DB fallback: custom alias
         const aliasRow = await this.repo.findByCustomAlias(code);
         if (aliasRow) {
             cacheMisses.inc();
@@ -28,7 +43,7 @@ export class RedirectService {
             return aliasRow.long_url;
         }
 
-        // 4️⃣ DB fallback: short code
+        // 4. DB fallback: short code
         const shortRow = await this.repo.findByShortCode(code);
         if (shortRow) {
             cacheMisses.inc();
@@ -39,22 +54,19 @@ export class RedirectService {
         return null;
     }
 
-    private async warmCache(key: string, row: any) {
-        const ttl = row.expiry_at
+    private async warmCache(key: string, row: { long_url: string; expiry_at: Date | null }) {
+        const ttlSeconds = row.expiry_at
             ? Math.max(
                 Math.floor((new Date(row.expiry_at).getTime() - Date.now()) / 1000),
-                1
+                60 // minimum 1 minute to avoid near-zero TTL spam
             )
-            : 86400;
+            : 86400; // 24h default
 
-        await redis.set(
+        // Safe set – never throws
+        await redisCache.set(
             key,
-            JSON.stringify({
-                longUrl: row.long_url,
-                expiresAt: row.expiry_at
-            }),
-            'EX',
-            Math.min(ttl, 86400)
+            { longUrl: row.long_url, expiresAt: row.expiry_at?.toISOString() ?? null },
+            { ex: Math.min(ttlSeconds, 86400 * 7) } // cap at 7 days
         );
     }
 }

@@ -4,19 +4,18 @@ import { checkRedis } from './redis.health';
 import { checkAnalyticsQueue } from './queue.health';
 
 export function registerHealthRoute(app: Express) {
-    app.get('/health', async (_req: Request, res: Response) => {
-        const [postgres, redis, analyticsQueue] = await Promise.all([
-            checkPostgres(),
-            checkRedis(),
-            checkAnalyticsQueue(),
-        ]);
+    app.get('/health/live', (_req, res) => res.status(200).json({ status: 'alive' }));
 
+    app.get('/health/ready', async (_req, res) => {
+        const postgres = await checkPostgres();
+        const redis = await checkRedis();
+        const analyticsQueue = await checkAnalyticsQueue();
         const healthy = postgres && redis && analyticsQueue;
-
         res.status(healthy ? 200 : 503).json({
-            status: healthy ? 'healthy' : 'unhealthy',
-            checks: { postgres, redis, analyticsQueue },
-            timestamp: new Date().toISOString(),
+            status: healthy ? 'ready' : 'not ready',
+            postgres,
+            redis,
+            analyticsQueue,
         });
     });
 }
