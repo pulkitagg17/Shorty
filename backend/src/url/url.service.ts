@@ -87,4 +87,61 @@ export class UrlService {
 
         return url;
     }
+
+    async updateUrl(
+        code: string,
+        userId: string,
+        params: {
+            longUrl?: string;
+            expiresAt?: Date | null;
+        }
+    ) {
+        const normalized = normalizeCode(code);
+        const url = await this.repo.findByShortCode(normalized);
+
+        const owned = this.assertOwnership(url, userId);
+        if (!owned) return null;
+
+        let nextLongUrl: string | undefined;
+        if (params.longUrl) {
+            const validated = validateUrl(params.longUrl);
+            nextLongUrl = validated.toString();
+        }
+
+        await this.repo.updateUrlById(owned.id, {
+            longUrl: nextLongUrl,
+            expiresAt: params.expiresAt ?? owned.expiresAt ?? null
+        });
+
+        await redis.del(`short:${owned.shortCode}`);
+        if (owned.customAlias) {
+            await redis.del(`alias:${owned.customAlias}`);
+        }
+
+        return {
+            shortCode: owned.shortCode,
+            longUrl: nextLongUrl ?? owned.longUrl,
+            customAlias: owned.customAlias,
+            expiresAt: params.expiresAt ?? owned.expiresAt ?? null
+        };
+    }
+
+    async deleteUrl(code: string, userId: string): Promise<boolean> {
+        const normalized = normalizeCode(code);
+        const url = await this.repo.findByShortCode(normalized);
+
+        const owned = this.assertOwnership(url, userId);
+        if (!owned) return false;
+
+        // Delete DB record
+        await this.repo.deleteById(owned.id);
+
+        // Invalidate cache (both possible keys)
+        await redis.del(`short:${owned.shortCode}`);
+        if (owned.customAlias) {
+            await redis.del(`alias:${owned.customAlias}`);
+        }
+
+        return true;
+    }
 }

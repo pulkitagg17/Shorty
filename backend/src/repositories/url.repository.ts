@@ -68,4 +68,25 @@ export class UrlRepository {
             expiresAt: row.expiry_at
         };
     }
+
+    async updateUrlById(
+        id: string,
+        data: { longUrl?: string; expiresAt?: Date | null }
+    ) {
+        await pool.query(
+            `
+                UPDATE urls
+                SET
+                long_url = COALESCE($1, long_url),
+                expiry_at = $2
+                WHERE id = $3
+                `,
+            [data.longUrl ?? null, data.expiresAt ?? null, id]
+        );
+    }
+
+    async deleteById(id: string) {
+        await pool.query(`DELETE FROM urls WHERE id = $1`, [id]);
+    }
+
 }

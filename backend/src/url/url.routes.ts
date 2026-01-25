@@ -69,4 +69,60 @@ export function registerUrlRoutes(app: Express) {
         }
     );
 
+    app.patch(
+        '/api/urls/:code',
+        requireAuth,
+        async (req: AuthenticatedRequest, res: Response) => {
+            const userId = req.user!.userId;
+            const rawCode = req.params.code;
+            const code = Array.isArray(rawCode) ? rawCode[0] : rawCode;
+
+            const { longUrl, expiresAt } = req.body as {
+                longUrl?: string;
+                expiresAt?: string | null;
+            };
+
+            // Reject alias changes explicitly
+            if ('customAlias' in req.body) {
+                return res.status(400).json({ error: 'customAlias cannot be changed' });
+            }
+
+            const parsedExpiry =
+                expiresAt === undefined
+                    ? undefined
+                    : expiresAt === null
+                        ? null
+                        : new Date(expiresAt);
+
+            const updated = await service.updateUrl(code, userId, {
+                longUrl,
+                expiresAt: parsedExpiry
+            });
+
+            if (!updated) {
+                return res.status(404).json({ error: 'Not found' });
+            }
+
+            res.json(updated);
+        }
+    );
+
+    app.delete(
+        '/api/urls/:code',
+        requireAuth,
+        async (req: AuthenticatedRequest, res: Response) => {
+            const userId = req.user!.userId;
+
+            const rawCode = req.params.code;
+            const code = Array.isArray(rawCode) ? rawCode[0] : rawCode;
+
+            const deleted = await service.deleteUrl(code, userId);
+
+            if (!deleted) {
+                return res.status(404).json({ error: 'Not found' });
+            }
+
+            res.status(204).send();
+        }
+    );
 }
