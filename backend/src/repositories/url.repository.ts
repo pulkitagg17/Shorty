@@ -39,7 +39,7 @@ export class UrlRepository {
     async getUrlsByUserId(userId: string) {
         const result = await pool.query(
             `
-            SELECT short_code, long_url, custom_alias, created_at
+            SELECT id, short_code, long_url, custom_alias, created_at
             FROM urls
             WHERE user_id = $1
             ORDER BY created_at DESC
@@ -48,6 +48,7 @@ export class UrlRepository {
         );
 
         return result.rows.map(row => ({
+            id: row.id,
             shortCode: row.short_code,
             longUrl: row.long_url,
             customAlias: row.custom_alias,

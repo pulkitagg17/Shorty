@@ -7,7 +7,7 @@ import { redirectLatency, redirectErrors } from '../metrics/metrics'
 const service = new RedirectService();
 
 export function registerRedirectRoutes(app: Express) {
-    app.get('/:code', async (req: Request, res: Response) => {
+    app.get('/api/:code', async (req: Request, res: Response) => {
         const end = redirectLatency.startTimer();
         try {
             const code = req.params.code as string;

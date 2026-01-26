@@ -19,7 +19,7 @@ const secureHeaders = {
 
 export function registerAuthRoutes(app: Express) {
     app.post(
-        '/auth/register',
+        '/api/auth/register',
         rateLimitRegister(),
         validateBody(registerSchema),
         async (req: Request, res: Response) => {
@@ -36,18 +36,18 @@ export function registerAuthRoutes(app: Express) {
     );
 
     app.post(
-        '/auth/login',
+        '/api/auth/login',
         validateBody(loginSchema),
         async (req: Request, res: Response) => {
             const ip = req.ip || 'unknown';
 
-            const allowed = await checkLoginRateLimit(ip);
-            if (!allowed) {
-                return res.status(429).json({
-                    success: false,
-                    error: 'Too many login attempts. Try again later.',
-                });
-            }
+            // const allowed = await checkLoginRateLimit(ip);
+            // if (!allowed) {
+            //     return res.status(429).json({
+            //         success: false,
+            //         error: 'Too many login attempts. Try again later.',
+            //     });
+            // }
 
             const { email, password } = req.body as z.infer<typeof loginSchema>;
 
@@ -62,7 +62,7 @@ export function registerAuthRoutes(app: Express) {
     );
 
     app.get(
-        '/auth/me',
+        '/api/auth/me',
         requireAuth,
         (req: AuthenticatedRequest, res: Response) => {
             successResponse(res, { userId: req.user!.userId });
@@ -70,7 +70,7 @@ export function registerAuthRoutes(app: Express) {
     );
 
     app.post(
-        '/auth/logout',
+        '/api/auth/logout',
         requireAuth,
         async (req: AuthenticatedRequest, res: Response) => {
             const sessionId = req.user!.sessionId;

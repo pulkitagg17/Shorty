@@ -1,4 +1,5 @@
 # Logs
+logs
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -10,26 +11,6 @@ node_modules
 dist
 dist-ssr
 *.local
-
-.env
-.env.local
-.env.*.local
-
-# Build artifacts
-build/
-*.tgz
-
-# IDE configs (if not shared across team)
-.vscode/
-.idea/
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Testing
-coverage/
-.nyc_output/
 
 # Editor directories and files
 .vscode/*

@@ -6,7 +6,7 @@ exports.up = (pgm) => {
             references: 'users(id)',
             onDelete: 'cascade'
         },
-        short_code: { type: 'char(8)', notNull: true, unique: true },
+        short_code: { type: 'varchar(8)', notNull: true, unique: true },
         long_url: { type: 'text', notNull: true },
         custom_alias: { type: 'varchar(20)' },
         expiry_at: { type: 'timestamp' },

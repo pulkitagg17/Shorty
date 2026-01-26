@@ -6,7 +6,8 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "worker": "ts-node src/analytics/analytics.worker.ts",
     "migrate:up": "node-pg-migrate up",
-    "migrate:down": "node-pg-migrate down"
+    "migrate:down": "node-pg-migrate down",
+    "build": "tsc"
   },
   "node-pg-migrate": {
     "migrations-dir": "migrations",
@@ -23,11 +24,13 @@
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "geoip-lite": "^1.4.10",
     "ioredis": "^5.9.2",
     "jsonwebtoken": "^9.0.3",
     "node-pg-migrate": "^8.0.4",
     "pg": "^8.17.2",
     "prom-client": "^15.1.3",
+    "ua-parser-js": "^2.0.8",
     "uuid": "^9.0.1",
     "zod": "^4.3.6"
   },

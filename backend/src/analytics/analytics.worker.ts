@@ -5,8 +5,10 @@ import { AnalyticsRepository } from '../repositories/analytics.repository';
 import {
     analyticsProcessed,
     analyticsFailed,
-    analyticsDropped,
 } from './analytics.queue';
+
+const { UAParser } = require('ua-parser-js');
+const geoip = require('geoip-lite');
 
 const repo = new AnalyticsRepository();
 
@@ -15,11 +17,32 @@ export const analyticsWorker = new Worker(
     'analytics',
     async (job) => {
         try {
-            await repo.insert(job.data);
+            const { userAgent, ip, ...rest } = job.data;
+
+            // Parse User Agent
+            const parser = new UAParser(userAgent);
+            const result = parser.getResult();
+            const os = result.os.name || 'Unknown';
+            const browser = result.browser.name || 'Unknown';
+            const device = result.device.type || 'desktop'; // Default to desktop if undefined
+
+            // Parse IP for Country
+            const geo = geoip.lookup(ip);
+            const country = geo ? geo.country : null;
+            const isBot = device === 'bot'; // Basic bot check (ua-parser handles some)
+
+            await repo.insert({
+                ...rest,
+                userAgent,
+                ip,
+                country,
+                os,
+                browser,
+                deviceType: device,
+                isBot
+            });
+
             analyticsProcessed.inc();
-            if (process.env.NODE_ENV !== 'production') {
-                console.debug(`Analytics job ${job.id} processed`);
-            }
         } catch (err) {
             analyticsFailed.inc();
 
@@ -31,13 +54,11 @@ export const analyticsWorker = new Worker(
     },
     {
         connection: redisClient,
-
-        // Worker settings – prevent runaway resource usage
-        concurrency: 5,                    // process up to 5 jobs concurrently
-        stalledInterval: 30000,            // detect stalled jobs every 30s
-        maxStalledCount: 3,                // mark job failed after 3 stalls
+        concurrency: 5,
+        stalledInterval: 30000,
+        maxStalledCount: 3,
         limiter: {
-            max: 100,                      // safety cap: max 100 jobs / min
+            max: 100,
             duration: 60 * 1000,
         },
     }

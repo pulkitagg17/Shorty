@@ -1,4 +1,5 @@
 import { pool } from '../infra/database';
+import crypto from 'crypto';
 
 export class AnalyticsRepository {
     async insert(event: {
@@ -7,7 +8,14 @@ export class AnalyticsRepository {
         ip: string;
         userAgent: string | null;
         referer: string | null;
+        country: string | null;
+        os: string | null;
+        browser: string | null;
+        deviceType: string | null;
+        isBot: boolean;
     }) {
+        const ipHash = crypto.createHash('sha256').update(event.ip).digest('hex');
+
         await pool.query(
             `
       INSERT INTO analytics (
@@ -16,57 +24,88 @@ export class AnalyticsRepository {
         timestamp,
         ip_hash,
         user_agent,
-        referer
+        referer,
+        country,
+        os,
+        browser,
+        device_type,
+        is_bot
       )
       VALUES (
         gen_random_uuid(),
         $1,
         to_timestamp(($2::BIGINT) / 1000),
-        encode(digest($3, 'sha256'), 'hex'),
+        $3,
         $4,
-        $5
+        $5,
+        $6,
+        $7,
+        $8,
+        $9,
+        $10
       )
       `,
             [
                 event.shortCode,
                 event.timestamp,
-                event.ip,
+                ipHash,
                 event.userAgent,
-                event.referer
+                event.referer,
+                event.country,
+                event.os,
+                event.browser,
+                event.deviceType,
+                event.isBot
             ]
         );
     }
 
-    async getStatsByShortCode(shortCode: string) {
+    async getStatsByShortCodes(shortCodes: string[]) {
         const total = await pool.query(
-            `SELECT COUNT(*) FROM analytics WHERE short_code = $1`,
-            [shortCode]
+            `SELECT COUNT(*) FROM analytics WHERE short_code = ANY($1)`,
+            [shortCodes]
         );
 
         const last = await pool.query(
-            `SELECT MAX(timestamp) AS last FROM analytics WHERE short_code = $1`,
-            [shortCode]
+            `SELECT MAX(timestamp) AS last FROM analytics WHERE short_code = ANY($1)`,
+            [shortCodes]
         );
 
         const countries = await pool.query(
             `SELECT country, COUNT(*) 
              FROM analytics 
-             WHERE short_code = $1 AND country IS NOT NULL
+             WHERE short_code = ANY($1) AND country IS NOT NULL
              GROUP BY country`,
-            [shortCode]
+            [shortCodes]
         );
 
         const devices = await pool.query(
             `SELECT device_type, COUNT(*) 
              FROM analytics 
-             WHERE short_code = $1 AND device_type IS NOT NULL
+             WHERE short_code = ANY($1) AND device_type IS NOT NULL
              GROUP BY device_type`,
-            [shortCode]
+            [shortCodes]
+        );
+
+        const os = await pool.query(
+            `SELECT os, COUNT(*) 
+             FROM analytics 
+             WHERE short_code = ANY($1) AND os IS NOT NULL
+             GROUP BY os`,
+            [shortCodes]
+        );
+
+        const browser = await pool.query(
+            `SELECT browser, COUNT(*) 
+             FROM analytics 
+             WHERE short_code = ANY($1) AND browser IS NOT NULL
+             GROUP BY browser`,
+            [shortCodes]
         );
 
         const bots = await pool.query(
-            `SELECT COUNT(*) FROM analytics WHERE short_code = $1 AND is_bot = true`,
-            [shortCode]
+            `SELECT COUNT(*) FROM analytics WHERE short_code = ANY($1) AND is_bot = true`,
+            [shortCodes]
         );
 
         return {
@@ -74,6 +113,8 @@ export class AnalyticsRepository {
             lastAccessed: last.rows[0].last,
             countries: countries.rows.map(r => ({ country: r.country, count: Number(r.count) })),
             devices: devices.rows.reduce((acc, r) => ({ ...acc, [r.device_type]: Number(r.count) }), {}),
+            osStats: os.rows.map(r => ({ os: r.os, count: Number(r.count) })),
+            browserStats: browser.rows.map(r => ({ browser: r.browser, count: Number(r.count) })),
             bots: Number(bots.rows[0].count),
         };
     }

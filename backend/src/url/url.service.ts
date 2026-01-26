@@ -13,7 +13,7 @@ export class UrlService {
         customAlias?: string;
     }) {
         const url = validateUrl(params.longUrl);
-        const shortCode = await this.generateUniqueCode();
+        const shortCode = (await this.generateUniqueCode());
         const id = uuidv4();
 
         await this.repo.insertUrl({
@@ -39,7 +39,7 @@ export class UrlService {
 
     private async generateUniqueCode(): Promise<string> {
         for (let i = 0; i < 3; i++) {
-            const code = generateShortCode(7);
+            const code = generateShortCode(7).trim();
             try {
                 // rely on DB uniqueness
                 return code;

@@ -9,17 +9,25 @@ export class AnalyticsService {
     ) { }
 
     async getStats(res: Response, code: string, userId: string) {
-        const url = await this.urlRepo.findByShortCode(code);
+        const url = await this.urlRepo.findOwnedByCode(code, userId);
 
-        if (
-            !url ||
-            url.userId !== userId ||
-            (url.expiresAt && url.expiresAt < new Date())
-        ) {
+        if (!url) {
             return res.status(404).json({ error: 'Not found' });
         }
 
-        const stats = await this.analyticsRepo.getStatsByShortCode(code);
-        return res.json(stats);
+        const codes = [url.shortCode];
+        if (url.customAlias) {
+            codes.push(url.customAlias);
+        }
+
+        const stats = await this.analyticsRepo.getStatsByShortCodes(codes);
+        return res.json({
+            ...stats,
+            url: {
+                shortCode: url.shortCode,
+                customAlias: url.customAlias,
+                longUrl: url.longUrl
+            }
+        });
     }
 }

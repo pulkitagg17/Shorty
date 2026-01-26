@@ -1,9 +1,5 @@
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { loginSchema } from "../lib/validators";
-import { z } from "zod";
-import { login } from "../api/auth.api";
-import { useAuthStore } from "../store/auth.store";
+import { useCreateUrl } from "../api/url.mutations";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,39 +19,39 @@ import {
     FormMessage,
 } from "@/components/ui/form";
 
-type LoginForm = z.infer<typeof loginSchema>;
+type CreateUrlForm = {
+    longUrl: string;
+    customAlias?: string;
+};
 
-export default function Login() {
+export default function CreateUrl() {
     const navigate = useNavigate();
-    const loadUser = useAuthStore((s) => s.loadUser);
+    const { mutateAsync, isPending } = useCreateUrl();
 
-    const form = useForm<LoginForm>({
-        resolver: zodResolver(loginSchema),
-        defaultValues: {
-            email: "",
-            password: "",
-        },
-    });
+    const form = useForm<CreateUrlForm>();
 
-    const onSubmit = async (data: LoginForm) => {
+    const onSubmit = async (data: CreateUrlForm) => {
         try {
-            await login(data.email, data.password);
-            await loadUser();
+            await mutateAsync({
+                longUrl: data.longUrl,
+                customAlias: data.customAlias || undefined
+            });
+
             navigate("/dashboard");
         } catch (err: any) {
             form.setError("root", {
-                message: err.error || "Login failed",
+                message: err.error || "Failed to create URL",
             });
         }
     };
 
     return (
-        <div className="flex min-h-screen items-center justify-center p-6 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-zinc-900 via-[#0a0a0a] to-black text-foreground">
-            <Card className="w-full max-w-sm border-border bg-card/40 backdrop-blur-xl shadow-2xl">
-                <CardHeader className="space-y-1">
-                    <CardTitle className="text-2xl font-bold tracking-tight bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">Login</CardTitle>
+        <div className="flex justify-center">
+            <Card className="w-full max-w-lg">
+                <CardHeader>
+                    <CardTitle className="text-xl">Create New URL</CardTitle>
                     <CardDescription>
-                        Enter your credentials to access your account.
+                        Shorten a long link to share it easily.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -63,25 +59,27 @@ export default function Login() {
                         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                             <FormField
                                 control={form.control}
-                                name="email"
+                                name="longUrl"
+                                rules={{ required: "Long URL is required" }}
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Email</FormLabel>
+                                        <FormLabel>Long URL</FormLabel>
                                         <FormControl>
-                                            <Input placeholder="m@example.com" {...field} />
+                                            <Input placeholder="https://example.com/very/long/url" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}
                             />
+
                             <FormField
                                 control={form.control}
-                                name="password"
+                                name="customAlias"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Password</FormLabel>
+                                        <FormLabel>Custom Alias (Optional)</FormLabel>
                                         <FormControl>
-                                            <Input type="password" {...field} />
+                                            <Input placeholder="my-custom-link" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -94,19 +92,18 @@ export default function Login() {
                                 </div>
                             )}
 
-                            <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                                {form.formState.isSubmitting ? "Logging in..." : "Login"}
-                            </Button>
+                            <div className="flex justify-end gap-2">
+                                <Button variant="ghost" asChild type="button">
+                                    <Link to="/dashboard">Cancel</Link>
+                                </Button>
+                                <Button type="submit" disabled={isPending}>
+                                    {isPending ? "Creating..." : "Create URL"}
+                                </Button>
+                            </div>
                         </form>
                     </Form>
-                    <div className="mt-4 text-center text-sm">
-                        Don&apos;t have an account?{" "}
-                        <Link to="/register" className="underline">
-                            Sign up
-                        </Link>
-                    </div>
                 </CardContent>
             </Card>
-        </div>
+        </div >
     );
 }
