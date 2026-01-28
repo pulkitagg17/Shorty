@@ -8,7 +8,6 @@ export class UrlRepository {
         longUrl: string;
         userId: string;
         customAlias?: string | null;
-        createdAt: Date;
         expiresAt?: Date | null;
     }) {
         try {
@@ -24,11 +23,10 @@ export class UrlRepository {
                     data.longUrl,
                     data.userId,
                     data.customAlias ?? null,
-                    data.expiresAt ?? null
-                ]
+                    data.expiresAt ?? null,
+                ],
             );
-        }
-        catch (err: any) {
+        } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
             if (err.code === '23505') {
                 throw new ConflictError('Alias already in use');
             }
@@ -44,15 +42,15 @@ export class UrlRepository {
             WHERE user_id = $1
             ORDER BY created_at DESC
             `,
-            [userId]
+            [userId],
         );
 
-        return result.rows.map(row => ({
+        return result.rows.map((row) => ({
             id: row.id,
             shortCode: row.short_code,
             longUrl: row.long_url,
             customAlias: row.custom_alias,
-            createdAt: row.created_at
+            createdAt: row.created_at,
         }));
     }
 
@@ -62,7 +60,7 @@ export class UrlRepository {
              FROM urls 
              WHERE short_code = $1
              AND (expiry_at IS NULL OR expiry_at > NOW())`,
-            [shortCode]
+            [shortCode],
         );
 
         if (result.rows.length === 0) return null;
@@ -75,7 +73,7 @@ export class UrlRepository {
             userId: row.user_id,
             customAlias: row.custom_alias,
             createdAt: row.created_at,
-            expiresAt: row.expiry_at
+            expiresAt: row.expiry_at,
         };
     }
 
@@ -95,7 +93,7 @@ export class UrlRepository {
                 AND user_id = $2
                 AND (expiry_at IS NULL OR expiry_at > NOW())
             `,
-            [code, userId]
+            [code, userId],
         );
 
         if (result.rows.length === 0) {
@@ -111,15 +109,11 @@ export class UrlRepository {
             customAlias: row.custom_alias,
             createdAt: row.created_at,
             expiresAt: row.expiry_at,
-            userId: row.user_id
+            userId: row.user_id,
         };
     }
 
-
-    async updateUrlById(
-        id: string,
-        data: { longUrl?: string; expiresAt?: Date | null }
-    ) {
+    async updateUrlById(id: string, data: { longUrl?: string; expiresAt?: Date | null }) {
         await pool.query(
             `
                 UPDATE urls
@@ -128,12 +122,11 @@ export class UrlRepository {
                 expiry_at = $2
                 WHERE id = $3
                 `,
-            [data.longUrl ?? null, data.expiresAt ?? null, id]
+            [data.longUrl ?? null, data.expiresAt ?? null, id],
         );
     }
 
     async deleteById(id: string) {
-        await pool.query(`DELETE FROM urls WHERE id = $1`, [id]);
+        await pool.query('DELETE FROM urls WHERE id = $1', [id]);
     }
-
 }

@@ -7,10 +7,21 @@ export async function emitAnalyticsEvent(event: {
     userAgent: string | null;
     referer: string | null;
 }) {
+    const safeEvent = {
+        ...event,
+        shortCode: event.shortCode.trim(),
+    };
+
     try {
-        await analyticsQueue.add('redirect', event);
-    } catch (err) {
-        // FAIL-SILENT: If analytics queue is down, drop the event.
-        // Priority is keeping the redirect working, not the stats.
+        await Promise.race([
+            analyticsQueue.add('redirect', safeEvent, {
+                removeOnComplete: true,
+                removeOnFail: true,
+                attempts: 1,
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Queue timeout')), 200)),
+        ]);
+    } catch {
+        // FAIL‑SILENT: analytics must never affect redirects
     }
 }

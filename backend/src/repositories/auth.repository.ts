@@ -15,14 +15,14 @@ export interface SessionRow {
 
 export class AuthRepository {
     /**
-   * Atomic: creates both user and initial session or rolls back both
-   */
+     * Atomic: creates both user and initial session or rolls back both
+     */
     async createUserAndSession(
         userId: string,
         email: string,
         passwordHash: string,
         sessionId: string,
-        expiresAt: Date
+        expiresAt: Date,
     ): Promise<void> {
         const client = await pool.connect();
 
@@ -32,17 +32,17 @@ export class AuthRepository {
             await client.query(
                 `INSERT INTO users (id, email, password_hash)
          VALUES ($1, $2, $3)`,
-                [userId, email, passwordHash]
+                [userId, email, passwordHash],
             );
 
             await client.query(
                 `INSERT INTO auth_sessions (id, user_id, expires_at)
          VALUES ($1, $2, $3)`,
-                [sessionId, userId, expiresAt]
+                [sessionId, userId, expiresAt],
             );
 
             await client.query('COMMIT');
-        } catch (err: any) {
+        } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
             await client.query('ROLLBACK');
 
             if (err.code === '23505') {
@@ -57,22 +57,18 @@ export class AuthRepository {
 
     async findUserByEmail(email: string): Promise<UserRow | null> {
         const result = await pool.query(
-            `SELECT id, email, password_hash FROM users WHERE email = $1`,
-            [email]
+            'SELECT id, email, password_hash FROM users WHERE email = $1',
+            [email],
         );
         const row = result.rows[0];
         return row ? (row as UserRow) : null;
     }
 
-    async createSession(
-        sessionId: string,
-        userId: string,
-        expiresAt: Date
-    ): Promise<void> {
+    async createSession(sessionId: string, userId: string, expiresAt: Date): Promise<void> {
         await pool.query(
             `INSERT INTO auth_sessions (id, user_id, expires_at)
        VALUES ($1, $2, $3)`,
-            [sessionId, userId, expiresAt]
+            [sessionId, userId, expiresAt],
         );
     }
 
@@ -81,7 +77,7 @@ export class AuthRepository {
             `SELECT id, user_id, expires_at
        FROM auth_sessions
        WHERE id = $1 AND expires_at > NOW()`,
-            [sessionId]
+            [sessionId],
         );
 
         const row = result.rows[0];
@@ -89,9 +85,6 @@ export class AuthRepository {
     }
 
     async deleteSession(sessionId: string): Promise<void> {
-        await pool.query(
-            `DELETE FROM auth_sessions WHERE id = $1`,
-            [sessionId]
-        );
+        await pool.query('DELETE FROM auth_sessions WHERE id = $1', [sessionId]);
     }
 }

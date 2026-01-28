@@ -12,25 +12,22 @@ export interface AuthenticatedRequest extends Request {
 
 const authRepo = new AuthRepository();
 
-export async function requireAuth(
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-) {
+export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     const token = req.cookies?.auth;
 
     if (!token) {
         throw new AuthError('No authentication token provided');
     }
 
-    let payload: JwtPayload;
+    const payload: JwtPayload = verifyJwt(token);
+
+    let session;
     try {
-        payload = verifyJwt(token);
-    } catch (err) {
-        throw err;
+        session = await authRepo.findSessionById(payload.sessionId);
+    } catch {
+        throw new AuthError('Authentication service unavailable');
     }
 
-    const session = await authRepo.findSessionById(payload.sessionId);
     if (!session) {
         throw new AuthError('Session invalid or revoked');
     }
@@ -42,8 +39,8 @@ export async function requireAuth(
 
     req.user = {
         userId: payload.userId,
-        sessionId: payload.sessionId
-    }
+        sessionId: payload.sessionId,
+    };
 
     next();
 }

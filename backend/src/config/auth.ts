@@ -12,17 +12,18 @@ export const authConfig = {
     jwtExpiresInSeconds: Number(env.JWT_EXPIRES_IN_SECONDS ?? 900), // 15 min
 
     sessionExpiresInSeconds: Number(
-        env.SESSION_EXPIRES_IN_SECONDS ?? 60 * 60 * 24 * 7 // 7 days
+        env.SESSION_EXPIRES_IN_SECONDS ?? 60 * 60 * 24 * 7, // 7 days
     ),
 
     cookie: {
         name: 'auth',
         secure: env.NODE_ENV === 'production',
-        sameSite: env.NODE_ENV === 'production' ? 'strict' as const : 'lax' as const,
+        sameSite: env.NODE_ENV === 'production' ? ('strict' as const) : ('lax' as const),
         httpOnly: true,
         path: '/',
         maxAge: Number(env.SESSION_EXPIRES_IN_SECONDS ?? 604800) * 1000, // ms
         partitioned: env.NODE_ENV === 'production',
+        domain: env.COOKIE_DOMAIN,
     },
 };
 

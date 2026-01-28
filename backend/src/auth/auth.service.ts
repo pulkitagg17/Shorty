@@ -1,4 +1,3 @@
-// src/auth/auth.service.ts
 import { v4 as uuidv4 } from 'uuid';
 import { AuthRepository } from '../repositories/auth.repository';
 import { hashPassword, verifyPassword } from '../shared/password';
@@ -14,9 +13,7 @@ export class AuthService {
         email = email.trim().toLowerCase();
 
         if (!this.isStrongPassword(password)) {
-            throw new ValidationError(
-                'Password must be 8-100 characters long'
-            );
+            throw new ValidationError('Password must be 8-100 characters long');
         }
 
         const passwordHash = await hashPassword(password);
@@ -25,13 +22,8 @@ export class AuthService {
         const expiresAt = new Date(Date.now() + authConfig.sessionExpiresInSeconds * 1000);
 
         try {
-            await this.repo.createUserAndSession(
-                userId,
-                email,
-                passwordHash,
-                sessionId,
-                expiresAt,
-            );
+            // Must be atomic: user + session created in a single transaction
+            await this.repo.createUserAndSession(userId, email, passwordHash, sessionId, expiresAt);
         } catch (err) {
             if (err instanceof ConflictError) {
                 throw err;
@@ -39,7 +31,8 @@ export class AuthService {
             throw new AuthError('Failed to create account');
         }
 
-        const token = signJwt({ userId, sessionId });
+        const token = signJwt({ userId, sessionId }, { expiresIn: authConfig.jwtExpiresInSeconds });
+
         return { token };
     }
 
@@ -62,7 +55,13 @@ export class AuthService {
     async login(email: string, password: string) {
         email = email.trim().toLowerCase();
 
-        const user = await this.repo.findUserByEmail(email);
+        let user;
+        try {
+            user = await this.repo.findUserByEmail(email);
+        } catch {
+            throw new AuthError('Authentication service unavailable');
+        }
+
         if (!user) {
             throw new AuthError('INVALID_CREDENTIALS');
         }
@@ -77,11 +76,14 @@ export class AuthService {
 
         try {
             await this.repo.createSession(sessionId, user.id, expiresAt);
-        } catch (err) {
-            throw new AuthError('Failed to create session');
+        } catch {
+            throw new AuthError('Authentication failed');
         }
 
-        const token = signJwt({ userId: user.id, sessionId });
+        const token = signJwt(
+            { userId: user.id, sessionId },
+            { expiresIn: authConfig.jwtExpiresInSeconds },
+        );
         return { token };
     }
 

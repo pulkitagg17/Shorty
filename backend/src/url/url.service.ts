@@ -7,45 +7,59 @@ import { redisCache } from '../infra/redis.cache';
 export class UrlService {
     private repo = new UrlRepository();
 
-    async createUrl(params: {
-        longUrl: string;
-        userId: string;
-        customAlias?: string;
-    }) {
+    async createUrl(params: { longUrl: string; userId: string; customAlias?: string }) {
         const url = validateUrl(params.longUrl);
-        const shortCode = (await this.generateUniqueCode());
-        const id = uuidv4();
 
-        await this.repo.insertUrl({
-            id,
-            shortCode,
-            longUrl: url.toString(),
-            createdAt: new Date(),
-            userId: params.userId,
-            customAlias: params.customAlias ?? undefined
-        });
+        let shortCode = params.customAlias || this.generateCode();
+        let retries = 0;
+
+        while (retries < 3) {
+            const id = uuidv4();
+            try {
+                await this.repo.insertUrl({
+                    id,
+                    shortCode,
+                    longUrl: url.toString(),
+                    userId: params.userId,
+                    customAlias: params.customAlias ?? undefined,
+                });
+                break;
+            } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+                // Check for unique constraint violation (code collision)
+                // Postgres error 23505 is unique_violation
+                if (err.code === '23505' && !params.customAlias) {
+                    shortCode = this.generateCode();
+                    retries++;
+                    continue;
+                }
+                throw err;
+            }
+        }
+
+        if (retries >= 3) {
+            throw new Error('Failed to generate unique code');
+        }
 
         // 🔥 CACHE WARMING (WRITE‑TIME ONLY)
-        await redisCache.set(
-            `short:${shortCode}`,
-            { longUrl: url.toString() },
-            { ex: 86400 }
-        );
+        try {
+            await redisCache.set(`short:${shortCode}`, { longUrl: url.toString() }, { ex: 86400 });
+
+            if (params.customAlias) {
+                await redisCache.set(`alias:${params.customAlias}`, { shortCode }, { ex: 86400 });
+            }
+        } catch {
+            // intentionally ignored
+        }
 
         return {
-            shortCode
+            shortCode,
+            customAlias: params.customAlias ?? null,
+            createdAt: new Date(),
         };
     }
 
-    private async generateUniqueCode(): Promise<string> {
-        for (let i = 0; i < 3; i++) {
-            const code = generateShortCode(7).trim();
-            try {
-                // rely on DB uniqueness
-                return code;
-            } catch { }
-        }
-        throw new Error('Short code collision');
+    private generateCode(): string {
+        return generateShortCode(7).trim();
     }
 
     async getUserUrls(userId: string) {
@@ -53,10 +67,7 @@ export class UrlService {
     }
 
     async getUrlByCode(code: string, userId: string) {
-        const url = await this.repo.findOwnedByCode(
-            code,
-            userId
-        );
+        const url = await this.repo.findOwnedByCode(code, userId);
 
         if (!url) {
             return null;
@@ -67,7 +78,7 @@ export class UrlService {
             longUrl: url.longUrl,
             customAlias: url.customAlias,
             createdAt: url.createdAt,
-            expiresAt: url.expiresAt
+            expiresAt: url.expiresAt,
         };
     }
 
@@ -77,10 +88,14 @@ export class UrlService {
         params: {
             longUrl?: string;
             expiresAt?: Date | null;
-        }
+        },
     ) {
         const url = await this.repo.findOwnedByCode(code, userId);
         if (!url) return null;
+
+        if (url.expiresAt && url.expiresAt <= new Date()) {
+            throw new Error('Cannot update expired URL');
+        }
 
         let nextLongUrl: string | undefined;
         if (params.longUrl !== undefined) {
@@ -90,22 +105,23 @@ export class UrlService {
 
         await this.repo.updateUrlById(url.id, {
             longUrl: nextLongUrl,
-            expiresAt:
-                params.expiresAt !== undefined
-                    ? params.expiresAt
-                    : url.expiresAt ?? null
+            expiresAt: params.expiresAt !== undefined ? params.expiresAt : (url.expiresAt ?? null),
         });
 
-        await redisCache.del(`short:${url.shortCode}`);
-        if (url.customAlias) {
-            await redisCache.del(`alias:${url.customAlias}`);
+        try {
+            await redisCache.del(`short:${url.shortCode}`);
+            if (url.customAlias) {
+                await redisCache.del(`alias:${url.customAlias}`);
+            }
+        } catch {
+            // intentionally ignored
         }
 
         return {
             shortCode: url.shortCode,
             longUrl: nextLongUrl ?? url.longUrl,
             customAlias: url.customAlias,
-            expiresAt: params.expiresAt ?? url.expiresAt ?? null
+            expiresAt: params.expiresAt ?? url.expiresAt ?? null,
         };
     }
 
@@ -117,9 +133,13 @@ export class UrlService {
         await this.repo.deleteById(url.id);
 
         // Invalidate cache (both possible keys)
-        await redisCache.del(`short:${url.shortCode}`);
-        if (url.customAlias) {
-            await redisCache.del(`alias:${url.customAlias}`);
+        try {
+            await redisCache.del(`short:${url.shortCode}`);
+            if (url.customAlias) {
+                await redisCache.del(`alias:${url.customAlias}`);
+            }
+        } catch {
+            // intentionally ignored
         }
 
         return true;

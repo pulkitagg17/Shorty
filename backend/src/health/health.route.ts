@@ -1,4 +1,4 @@
-import { Express, Request, Response } from 'express';
+import { Express } from 'express';
 import { checkPostgres } from './postgres.health';
 import { checkRedis } from './redis.health';
 import { checkAnalyticsQueue } from './queue.health';
@@ -8,7 +8,7 @@ export function registerHealthRoute(app: Express) {
 
     app.get('/health/ready', async (_req, res) => {
         const postgres = await checkPostgres();
-        const redis = await checkRedis();
+        const redis = (await checkRedis()).healthy;
         const analyticsQueue = await checkAnalyticsQueue();
         const healthy = postgres && redis && analyticsQueue;
         res.status(healthy ? 200 : 503).json({

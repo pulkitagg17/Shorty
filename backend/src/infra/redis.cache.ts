@@ -14,7 +14,7 @@ export const redisCache = {
     async set(
         key: string,
         value: CacheValue,
-        options: { ex?: number; nx?: boolean } = {}
+        options: { ex?: number; nx?: boolean } = {},
     ): Promise<void> {
         try {
             let valueStr: string;

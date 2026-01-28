@@ -3,7 +3,7 @@ import { createApp } from './app';
 import { env } from './config/env';
 import { pool } from './infra/database';
 import { redisClient } from './infra/redis.client';
-import { analyticsWorker, closeAnalyticsWorker } from './analytics/analytics.worker';
+import { closeAnalyticsWorker } from './analytics/analytics.worker';
 import './analytics/queue.monitor';
 
 const app = createApp();
@@ -69,7 +69,6 @@ process.on('SIGTERM', shutdown);
 
 process.on('unhandledRejection', (reason) => {
     console.error('❌ Unhandled Rejection', reason);
-    process.exit(1);
 });
 
 process.on('uncaughtException', (error) => {

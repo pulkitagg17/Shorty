@@ -2,12 +2,10 @@
 export async function withTimeout<T>(
     promise: Promise<T>,
     ms: number,
-    errorMessage: string
+    errorMessage: string,
 ): Promise<T> {
     return Promise.race([
         promise,
-        new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error(errorMessage)), ms)
-        ),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(errorMessage)), ms)),
     ]);
 }

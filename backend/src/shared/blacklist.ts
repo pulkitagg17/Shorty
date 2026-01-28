@@ -5,7 +5,7 @@ export async function isUrlBlacklisted(longUrl: string): Promise<boolean> {
         `SELECT 1 FROM blacklisted_urls 
          WHERE $1 ILIKE pattern 
          LIMIT 1`,
-        [longUrl]
+        [longUrl],
     );
     return result.rows.length > 0;
 }

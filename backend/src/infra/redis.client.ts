@@ -1,4 +1,3 @@
-// src/infra/redis.client.ts
 import Redis from 'ioredis';
 
 const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
@@ -10,13 +9,9 @@ export const redisClient = new Redis(redisUrl, {
     enableOfflineQueue: false,
     maxRetriesPerRequest: null, // Required for BullMQ
     retryStrategy: (times) => {
-        // ❌ DELETED: if (times > 10) return null; 
-
-        // ✅ NEW: Return a number so it retries FOREVER
-        // This prevents the "Connection is closed" error
         const delay = isProduction
-            ? Math.min(times * 500, 5000)   // Cap at 5s
-            : Math.min(times * 100, 3000);  // Cap at 3s
+            ? Math.min(times * 500, 5000) // Cap at 5s
+            : Math.min(times * 100, 3000); // Cap at 3s
         return delay;
     },
 });
@@ -27,7 +22,6 @@ redisClient.on('close', () => console.debug('[REDIS] Connection closed'));
 redisClient.on('reconnecting', () => console.debug('[REDIS] Reconnecting...'));
 
 redisClient.on('error', (err) => {
-    // ✅ NEW: Added 'ECONNREFUSED' to silence the spam logs
     if (
         err.message.includes('Connection is closed') ||
         err.message.includes('read ECONNRESET') ||
@@ -37,4 +31,8 @@ redisClient.on('error', (err) => {
         return;
     }
     console.error('[REDIS] Connection error:', err.message);
+});
+
+redisClient.connect().catch((err) => {
+    console.error('[REDIS] Initial connection failed', err.message);
 });

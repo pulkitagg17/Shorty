@@ -2,13 +2,9 @@
 import { Worker } from 'bullmq';
 import { redisClient } from '../infra/redis.client';
 import { AnalyticsRepository } from '../repositories/analytics.repository';
-import {
-    analyticsProcessed,
-    analyticsFailed,
-} from './analytics.queue';
-
-const { UAParser } = require('ua-parser-js');
-const geoip = require('geoip-lite');
+import { analyticsProcessed, analyticsFailed } from './analytics.queue';
+import { UAParser } from 'ua-parser-js';
+import geoip from 'geoip-lite';
 
 const repo = new AnalyticsRepository();
 
@@ -17,7 +13,8 @@ export const analyticsWorker = new Worker(
     'analytics',
     async (job) => {
         try {
-            const { userAgent, ip, ...rest } = job.data;
+            const { userAgent, ip: rawIp, ...rest } = job.data;
+            const ip = rawIp || '0.0.0.0';
 
             // Parse User Agent
             const parser = new UAParser(userAgent);
@@ -29,7 +26,10 @@ export const analyticsWorker = new Worker(
             // Parse IP for Country
             const geo = geoip.lookup(ip);
             const country = geo ? geo.country : null;
-            const isBot = device === 'bot'; // Basic bot check (ua-parser handles some)
+            const ua = (userAgent || '').toLowerCase();
+            const isBot = /bot|crawler|spider|crawling|preview|facebookexternalhit|slackbot/.test(
+                ua,
+            );
 
             await repo.insert({
                 ...rest,
@@ -39,7 +39,7 @@ export const analyticsWorker = new Worker(
                 os,
                 browser,
                 deviceType: device,
-                isBot
+                isBot,
             });
 
             analyticsProcessed.inc();
@@ -61,7 +61,7 @@ export const analyticsWorker = new Worker(
             max: 100,
             duration: 60 * 1000,
         },
-    }
+    },
 );
 
 // Graceful shutdown hook (called from server.ts)
@@ -69,10 +69,9 @@ analyticsWorker.on('closing', () => {
     console.log('[ANALYTICS WORKER] Closing...');
 });
 
-export async function closeAnalyticsWorker(timeoutMs: number = 10000): Promise<void> {
+export async function closeAnalyticsWorker(timeoutMs = 10000) {
     const timeout = setTimeout(() => {
-        console.warn('[ANALYTICS WORKER] Force closing after timeout');
-        process.exit(1); // extreme fallback — consider softer handling in real prod
+        console.warn('[ANALYTICS WORKER] Close timeout exceeded');
     }, timeoutMs);
 
     try {
@@ -80,7 +79,7 @@ export async function closeAnalyticsWorker(timeoutMs: number = 10000): Promise<v
         clearTimeout(timeout);
         console.log('[ANALYTICS WORKER] Closed gracefully');
     } catch (err) {
-        console.error('[ANALYTICS WORKER] Error during close:', err);
         clearTimeout(timeout);
+        console.error('[ANALYTICS WORKER] Error during close:', err);
     }
 }

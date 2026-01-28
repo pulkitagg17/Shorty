@@ -9,9 +9,13 @@ export interface JwtPayload {
     exp?: number;
 }
 
-export function signJwt(payload: Omit<JwtPayload, 'iat' | 'exp'>): string {
+export function signJwt(
+    payload: Omit<JwtPayload, 'iat' | 'exp'>,
+    options?: jwt.SignOptions,
+): string {
     return jwt.sign(payload, authConfig.jwtSecret, {
         expiresIn: authConfig.jwtExpiresInSeconds,
+        ...options,
     });
 }
 

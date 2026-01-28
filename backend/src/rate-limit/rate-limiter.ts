@@ -35,34 +35,67 @@ export async function checkRateLimit(
     key: string,
     maxRequests: number,
     windowSeconds: number,
-    limiterType: string = 'general'
+    limiterType: string = 'general',
 ): Promise<boolean> {
     const now = Date.now();
     const windowStartMs = now - windowSeconds * 1000;
 
+    // Lua script to atomically:
+    // 1. Remove old entries (ZREMRANGEBYSCORE)
+    // 2. Count current entries (ZCARD)
+    // 3. If count < max, add new entry (ZADD) & set expiry (EXPIRE)
+    // 4. Return count and allowed status
+    const script = `
+        local key = KEYS[1]
+        local now = tonumber(ARGV[1])
+        local windowStartMs = tonumber(ARGV[2])
+        local maxRequests = tonumber(ARGV[3])
+        local windowSeconds = tonumber(ARGV[4])
+        local uniqueMember = ARGV[5]
+
+        -- Remove old entries
+        redis.call('ZREMRANGEBYSCORE', key, '-inf', windowStartMs)
+
+        -- Count current requests
+        local count = redis.call('ZCARD', key)
+
+        if count >= maxRequests then
+            return 0 -- Blocked
+        end
+
+        -- Add current request
+        redis.call('ZADD', key, now, uniqueMember)
+        
+        -- Set expiry
+        redis.call('EXPIRE', key, windowSeconds + 60)
+
+        return 1 -- Allowed
+    `;
+
     try {
-        // Remove old entries outside the window
-        await redisClient.zremrangebyscore(key, '-inf', windowStartMs);
+        const uniqueMember = `${now}-${Math.random().toString(36).slice(2)}`;
 
-        // Count current requests in window
-        const count = await redisClient.zcard(key);
+        const result = await redisClient.eval(
+            script,
+            1, // number of keys
+            key,
+            String(now),
+            String(windowStartMs),
+            String(maxRequests),
+            String(windowSeconds),
+            uniqueMember,
+        );
 
-        if (count >= maxRequests) {
+        if (result === 1) {
+            rateLimitAllowed.inc({ limiter_type: limiterType });
+            return true;
+        } else {
             rateLimitBlocked.inc({ limiter_type: limiterType });
             return false;
         }
-
-        // Add current request timestamp
-        const member = `${now}-${Math.random().toString(36).slice(2)}`; // unique member
-        await redisClient.zadd(key, now, member);
-
-        // Set expiry slightly longer than window to allow natural cleanup
-        await redisClient.expire(key, windowSeconds + 60);
-
-        rateLimitAllowed.inc({ limiter_type: limiterType });
-        return true;
     } catch (err) {
         // FAIL-OPEN: never block legitimate traffic because of Redis issues
+        console.error('[RateLimit] Redis error:', err);
         rateLimitSkipped.inc({ limiter_type: limiterType });
         return true;
     }

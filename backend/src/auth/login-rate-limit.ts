@@ -3,9 +3,9 @@ import { checkRateLimit, rateLimitSkipped } from '../rate-limit/rate-limiter';
 
 // Config - move to config/ or env if you want to tune per-env
 const LOGIN_RATE_LIMIT = {
-    windowSeconds: 900,       // 15 minutes
-    maxAttempts: 5,
-} as const;
+    windowSeconds: Number(process.env.LOGIN_RATE_LIMIT_WINDOW ?? 900),
+    maxAttempts: Number(process.env.LOGIN_RATE_LIMIT_MAX ?? 5),
+};
 
 const LIMITER_TYPE = 'login';
 
@@ -20,7 +20,7 @@ export async function checkLoginRateLimit(ip: string): Promise<boolean> {
         key,
         LOGIN_RATE_LIMIT.maxAttempts,
         LOGIN_RATE_LIMIT.windowSeconds,
-        LIMITER_TYPE
+        LIMITER_TYPE,
     );
 }
 

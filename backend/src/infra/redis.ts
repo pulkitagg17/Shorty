@@ -9,7 +9,7 @@ try {
         connectTimeout: 50,
         enableOfflineQueue: false,
         maxRetriesPerRequest: 1,
-        lazyConnect: true
+        lazyConnect: true,
     });
 
     r.on('error', () => {
@@ -39,17 +39,21 @@ export const redis = {
         }
     },
 
-    async set(...args: any[]) {
+    async set(...args: any[]) { // eslint-disable-line @typescript-eslint/no-explicit-any
         if (!client) return;
         try {
-            await (client as any).set(...args);
-        } catch { }
+            await (client as any).set(...args); // eslint-disable-line @typescript-eslint/no-explicit-any
+        } catch {
+            // intentionally ignored
+        }
     },
 
     async del(key: string) {
         if (!client) return;
         try {
             await client.del(key);
-        } catch { }
-    }
+        } catch {
+            // intentionally ignored
+        }
+    },
 };

@@ -10,22 +10,28 @@ import { Gauge } from 'prom-client';
 // Prometheus metrics for monitoring
 export const redisHealthyGauge = new Gauge({
     name: 'redis_healthy',
-    help: '1 if Redis is considered healthy, 0 otherwise'
+    help: '1 if Redis is considered healthy, 0 otherwise',
 });
 
 export const redisCircuitOpen = new Gauge({
     name: 'redis_circuit_open',
-    help: '1 if Redis circuit breaker is open (failing fast)'
+    help: '1 if Redis circuit breaker is open (failing fast)',
 });
 
-export async function checkRedis(): Promise<{ healthy: boolean; details: string }> {
+export async function checkRedis(): Promise<{
+    healthy: boolean;
+    details: string;
+}> {
     const isOpen = isRedisCircuitOpen();
 
     redisCircuitOpen.set(isOpen ? 1 : 0);
 
     if (isOpen) {
         redisHealthyGauge.set(0);
-        return { healthy: false, details: 'Circuit breaker is open due to repeated failures' };
+        return {
+            healthy: false,
+            details: 'Circuit breaker is open due to repeated failures',
+        };
     }
 
     try {

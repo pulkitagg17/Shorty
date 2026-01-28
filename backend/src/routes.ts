@@ -11,6 +11,6 @@ export function registerRoutes(app: Express) {
     registerHealthRoute(app);
     registerAuthRoutes(app);
     registerUrlRoutes(app);
-    registerRedirectRoutes(app);
     registerAnalyticsRoutes(app);
+    registerRedirectRoutes(app);
 }

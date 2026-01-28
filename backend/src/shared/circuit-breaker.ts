@@ -14,12 +14,12 @@ export function recordRedisFailure() {
 
 export function recordRedisSuccess() {
     failureCount = 0;
-    circuitOpenUntil = 0;           // ← reset immediately on success
+    circuitOpenUntil = 0; // ← reset immediately on success
 }
 
 export function isRedisCircuitOpen(): boolean {
     if (Date.now() >= circuitOpenUntil) {
-        circuitOpenUntil = 0;       // auto-close when time passes
+        circuitOpenUntil = 0; // auto-close when time passes
     }
     return circuitOpenUntil > Date.now();
 }
