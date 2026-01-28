@@ -1,5 +1,5 @@
 import { useForm } from "react-hook-form";
-import { useCreateUrl } from "../api/url.mutations";
+import { useCreateUrl } from "@/api/url.mutations";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

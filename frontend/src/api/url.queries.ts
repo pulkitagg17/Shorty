@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { listUrls, getUrl } from "./url.api";
+import { listUrls, getUrl } from "@/api/url.api";
 
 export function useUrls() {
     return useQuery({

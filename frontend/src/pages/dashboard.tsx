@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
-import { useUrls } from "../api/url.queries";
-import { formatDate, buildShortUrl, getStatus } from "../lib/helper";
+import { useUrls } from "@/api/url.queries";
+import { formatDate, buildShortUrl, getStatus } from "@/lib/helper";
 import { Link } from "react-router-dom";
 import { Copy, MoreHorizontal, BarChart2, Edit, ExternalLink, Plus, Search, Link2, Activity, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";

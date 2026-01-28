@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { LogoutButton } from "./LogoutButton";
+import { LogoutButton } from "@/components/LogoutButton";
 import { Link as LinkIcon } from "lucide-react";
 
 import { motion } from "framer-motion";

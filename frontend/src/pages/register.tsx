@@ -1,9 +1,9 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { registerSchema } from "../lib/validators";
+import { registerSchema } from "@/lib/validators";
 import { z } from "zod";
-import { register as apiRegister } from "../api/auth.api";
-import { useAuthStore } from "../store/auth.store";
+import { register as apiRegister } from "@/api/auth.api";
+import { useAuthStore } from "@/store/auth.store";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -1,7 +1,7 @@
 import { useParams, Link } from "react-router-dom";
-import { useAnalytics } from "../api/analytics.queries";
-import { DeviceChart } from "../components/DeviceChart";
-import { BACKEND_URL } from "../config/env";
+import { useAnalytics } from "@/api/analytics.queries";
+import { DeviceChart } from "@/components/DeviceChart";
+import { BACKEND_URL } from "@/config/env";
 import {
     Card,
     CardContent,

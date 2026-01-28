@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { me, logout as apiLogout } from "../api/auth.api";
+import { me, logout as apiLogout } from "@/api/auth.api";
 
 export type User = {
     id: string;

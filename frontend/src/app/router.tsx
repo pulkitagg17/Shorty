@@ -1,10 +1,10 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import Login from "../pages/Login";
-import Register from "../pages/Register";
-import Dashboard from "../pages/Dashboard";
-import CreateUrl from "../pages/CreateUrl";
-import EditUrl from "../pages/EditUrl";
-import Analytics from "../pages/Analytics";
+import Login from "@/pages/Login";
+import Register from "@/pages/Register";
+import Dashboard from "@/pages/Dashboard";
+import CreateUrl from "@/pages/CreateUrl";
+import EditUrl from "@/pages/EditUrl";
+import Analytics from "@/pages/Analytics";
 import { ProtectedRoute } from "../components/ProtectedRoute";
 import { PublicRoute } from "../components/PublicRoute";
 import { Layout } from "../components/Layout";
@@ -21,7 +21,7 @@ export function AppRouter() {
                     </PublicRoute>
                 }
             />
-            
+
             <Route
                 path="/register"
                 element={

@@ -1,8 +1,8 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { useEffect } from "react";
-import { useUrl } from "../api/url.queries";
-import { useUpdateUrl, useDeleteUrl } from "../api/url.mutations";
+import { useUrl } from "@/api/url.queries";
+import { useUpdateUrl, useDeleteUrl } from "@/api/url.mutations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {

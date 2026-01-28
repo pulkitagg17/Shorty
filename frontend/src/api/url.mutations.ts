@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createUrl, updateUrl, deleteUrl } from "./url.api";
+import { createUrl, updateUrl, deleteUrl } from "@/api/url.api";
 
 export function useCreateUrl() {
     const queryClient = useQueryClient();
