@@ -7,6 +7,7 @@
     "worker": "ts-node src/analytics/analytics.worker.ts",
     "migrate:up": "node-pg-migrate up",
     "migrate:down": "node-pg-migrate down",
+    "migrate:create": "node-pg-migrate create",
     "build": "tsc"
   },
   "node-pg-migrate": {
