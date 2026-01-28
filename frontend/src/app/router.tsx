@@ -21,6 +21,7 @@ export function AppRouter() {
                     </PublicRoute>
                 }
             />
+            
             <Route
                 path="/register"
                 element={
