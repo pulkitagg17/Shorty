@@ -46,9 +46,9 @@ graph TD
 
     subgraph "Redirect Flow (Hot Path)"
         Server -->|1. Check Cache| RedisCache
-        RedisCache -- Miss --> Server
-        Server -->|2. DB Lookup (Fallback)| DB
-        DB -- Result --> Server
+        RedisCache -->|Miss| Server
+        Server -->|2. DB Lookup - Fallback| DB
+        DB -->|Result| Server
         Server -->|3. Populate Cache| RedisCache
         Server -->|4. 302 Redirect| Client
     end
