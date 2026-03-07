@@ -28,41 +28,59 @@ Shorty is a robust, scalable, and high-performance URL shortening service design
 
 ## 📐 System Design
 
-The system is designed to prioritize **read availability** and **low latency**.
+The system was built to maximise **read availability**, **scale horizontally**, and deliver **sub‑10ms redirects** even under heavy load. A simplified overview of the major components and their interactions is shown below.
+
+> ✅ Redis handles hot‑path lookups, PostgreSQL is the source of truth, and analytics are written asynchronously so that the redirect request never blocks on disk I/O.
 
 ```mermaid
 graph TD
-    Client[User / Client]
-    LB[Load Balancer / Nginx]
-    Server[Node.js API Server]
-    RedisCache[(Redis Cache)]
-    RedisQueue[(Redis BullMQ)]
-    Worker[Analytics Worker]
-    DB[(PostgreSQL Primary)]
-    Prometheus[Prometheus Monitor]
+    %% core actors
+    Client["User / Client"]
+    LB["Load Balancer / Nginx"]
+    Server["Node.js (Express) API"]
+    RedisCache[("Redis Cache")]
+    RedisQueue[("BullMQ / Redis Queue")]
+    Worker["Analytics Worker"]
+    DB[("PostgreSQL Primary")]
+    Prometheus["Prometheus"]
 
-    Client -->|HTTP GET /:code| LB
+    %% request path
+    Client -->|"HTTP GET /:code"| LB
     LB --> Server
 
-    subgraph "Redirect Flow (Hot Path)"
-        Server -->|1. Check Cache| RedisCache
+    subgraph "Redirect Flow (hot path)"
+        Server -->|"1. check cache"| RedisCache
         RedisCache -- Miss --> Server
-        Server -->|2. DB Lookup (Fallback)| DB
-        DB -- Result --> Server
-        Server -->|3. Populate Cache| RedisCache
-        Server -->|4. 302 Redirect| Client
+        Server -->|"2. fallback lookup"| DB
+        DB -- "url + expiry" --> Server
+        Server -->|"3. cache result"| RedisCache
+        Server -->|"4. 302 redirect"| Client
     end
 
-    subgraph "Async Analytics (Write Path)"
-        Server -.->|5. Enqueue Event| RedisQueue
+    subgraph "Async analytics (write path)"
+        Server -.->|"5. enqueue event"| RedisQueue
         RedisQueue --> Worker
-        Worker -->|6. Batch Insert| DB
+        Worker -->|"6. batch insert"| DB
     end
 
     subgraph "Monitoring"
-        Prometheus --> |Scrape /metrics| Server
+        Prometheus -->|"scrapes /metrics"| Server
     end
 ```
+
+### Data flow explained
+
+1.  **Redirection**
+    -  Incoming short‑URL requests hit the API through a load balancer.
+    -  A Redis cache lookup is attempted first; hits are returned immediately with a `302`.
+    -  Cache misses fall back to PostgreSQL. The result is cached (24 h or until the link expires) and the client is redirected.
+
+2.  **Analytics**
+    -  Redirect requests **never** write to the database directly. Instead, an event describing the hit is pushed to a BullMQ queue.
+    -  Dedicated worker processes consume the queue and perform bulk inserts into a time‑partitioned PostgreSQL analytics table. This keeps the hot path fast and lets analytics scale independently.
+
+3.  **Monitoring**
+    -  The API exposes a `/metrics` endpoint. Prometheus periodically scrapes it for latency, cache hit/miss, error counts, and other observability metrics.
 
 ### Data Flow Explanation
 
