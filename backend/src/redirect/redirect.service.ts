@@ -12,11 +12,9 @@ export class RedirectService {
         // Negative caching check (Fail-Open)
         try {
             if (await redisCache.get(`miss:${code}`)) return null;
-        }
-        catch {
+        } catch {
             // fail-open: cache is best-effort
         }
-
 
         // 1. Try custom alias cache (Fail-Open)
         let aliasCache: string | null = null;
@@ -103,9 +101,9 @@ export class RedirectService {
     private async warmCache(key: string, row: { long_url: string; expiry_at: Date | null }) {
         const ttlSeconds = row.expiry_at
             ? Math.max(
-                Math.floor((new Date(row.expiry_at).getTime() - Date.now()) / 1000),
-                60, // minimum 1 minute to avoid near-zero TTL spam
-            )
+                  Math.floor((new Date(row.expiry_at).getTime() - Date.now()) / 1000),
+                  60, // minimum 1 minute to avoid near-zero TTL spam
+              )
             : 86400; // 24h default
 
         // Safe set – never throws

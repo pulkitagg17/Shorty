@@ -1,4 +1,4 @@
-import { pool } from '../infra/database';
+import { prisma } from '../infra/prisma';
 import crypto from 'crypto';
 
 export class AnalyticsRepository {
@@ -20,50 +20,22 @@ export class AnalyticsRepository {
             .digest('hex');
 
         try {
-            await pool.query(
-                `
-      INSERT INTO analytics (
-        event_id,
-        short_code,
-        timestamp,
-        ip_hash,
-        user_agent,
-        referer,
-        country,
-        os,
-        browser,
-        device_type,
-        is_bot
-      )
-      VALUES (
-        gen_random_uuid(),
-        $1,
-        to_timestamp(($2::BIGINT) / 1000),
-        $3,
-        $4,
-        $5,
-        $6,
-        $7,
-        $8,
-        $9,
-        $10
-      )
-      `,
-                [
-                    event.shortCode,
-                    event.timestamp,
+            await prisma.analytics.create({
+                data: {
+                    shortCode: event.shortCode,
+                    timestamp: new Date(event.timestamp),
                     ipHash,
-                    event.userAgent,
-                    event.referer,
-                    event.country,
-                    event.os,
-                    event.browser,
-                    event.deviceType,
-                    event.isBot,
-                ],
-            );
+                    userAgent: event.userAgent,
+                    referer: event.referer,
+                    country: event.country,
+                    os: event.os,
+                    browser: event.browser,
+                    deviceType: event.deviceType,
+                    isBot: event.isBot,
+                },
+            });
         } catch (err) {
-            console.error('[ANALYTICS] insert failed', err);
+            console.error('[ANALYTICS INSERT FAILED]', err);
         }
     }
 
@@ -80,70 +52,78 @@ export class AnalyticsRepository {
             };
         }
 
-        const [total, last, countries, devices, os, browser, bots] = await Promise.all([
-            pool.query('SELECT COUNT(*) FROM analytics WHERE short_code = ANY($1)', [shortCodes]),
-            pool.query('SELECT MAX(timestamp) AS last FROM analytics WHERE short_code = ANY($1)', [
-                shortCodes,
-            ]),
-            pool.query(
-                `
-                SELECT country, COUNT(*)
-                FROM analytics
-                WHERE short_code = ANY($1) AND country IS NOT NULL
-                GROUP BY country
-            `,
-                [shortCodes],
-            ),
-            pool.query(
-                `
-                SELECT device_type, COUNT(*)
-                FROM analytics
-                WHERE short_code = ANY($1) AND device_type IS NOT NULL
-                GROUP BY device_type
-            `,
-                [shortCodes],
-            ),
-            pool.query(
-                `
-                SELECT os, COUNT(*)
-                FROM analytics
-                WHERE short_code = ANY($1) AND os IS NOT NULL
-                GROUP BY os
-            `,
-                [shortCodes],
-            ),
-            pool.query(
-                `
-                SELECT browser, COUNT(*)
-                FROM analytics
-                WHERE short_code = ANY($1) AND browser IS NOT NULL
-                GROUP BY browser
-            `,
-                [shortCodes],
-            ),
-            pool.query(
-                'SELECT COUNT(*) FROM analytics WHERE short_code = ANY($1) AND is_bot = true',
-                [shortCodes],
-            ),
-        ]);
+        const where = {
+            shortCode: { in: shortCodes },
+        };
+
+        const [totalClicks, lastAccessedRow, countries, devices, osStats, browserStats, bots] =
+            await Promise.all([
+                prisma.analytics.count({ where }),
+
+                prisma.analytics.aggregate({
+                    where,
+                    _max: { timestamp: true },
+                }),
+
+                prisma.analytics.groupBy({
+                    by: ['country'],
+                    where: { ...where, country: { not: null } },
+                    _count: { country: true },
+                }),
+
+                prisma.analytics.groupBy({
+                    by: ['deviceType'],
+                    where: { ...where, deviceType: { not: null } },
+                    _count: { deviceType: true },
+                }),
+
+                prisma.analytics.groupBy({
+                    by: ['os'],
+                    where: { ...where, os: { not: null } },
+                    _count: { os: true },
+                }),
+
+                prisma.analytics.groupBy({
+                    by: ['browser'],
+                    where: { ...where, browser: { not: null } },
+                    _count: { browser: true },
+                }),
+
+                prisma.analytics.count({
+                    where: { ...where, isBot: true },
+                }),
+            ]);
 
         return {
-            totalClicks: Number(total.rows[0].count),
-            lastAccessed: last.rows[0].last,
-            countries: countries.rows.map((r) => ({
-                country: r.country,
-                count: Number(r.count),
+            totalClicks,
+            lastAccessed: lastAccessedRow._max.timestamp,
+
+            countries: countries.map((c) => ({
+                country: c.country,
+                count: c._count.country,
             })),
-            devices: devices.rows.reduce(
-                (acc, r) => ({ ...acc, [r.device_type]: Number(r.count) }),
-                {},
+
+            devices: devices.reduce(
+                (acc, d) => {
+                    if (d.deviceType) {
+                        acc[d.deviceType] = d._count.deviceType;
+                    }
+                    return acc;
+                },
+                {} as Record<string, number>,
             ),
-            osStats: os.rows.map((r) => ({ os: r.os, count: Number(r.count) })),
-            browserStats: browser.rows.map((r) => ({
-                browser: r.browser,
-                count: Number(r.count),
+
+            osStats: osStats.map((o) => ({
+                os: o.os,
+                count: o._count.os,
             })),
-            bots: Number(bots.rows[0].count),
+
+            browserStats: browserStats.map((b) => ({
+                browser: b.browser,
+                count: b._count.browser,
+            })),
+
+            bots,
         };
     }
 }

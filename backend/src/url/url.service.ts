@@ -24,7 +24,8 @@ export class UrlService {
                     customAlias: params.customAlias ?? undefined,
                 });
                 break;
-            } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+            } catch (err: any) {
+                // eslint-disable-line @typescript-eslint/no-explicit-any
                 // Check for unique constraint violation (code collision)
                 // Postgres error 23505 is unique_violation
                 if (err.code === '23505' && !params.customAlias) {

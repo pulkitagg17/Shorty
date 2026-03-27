@@ -39,7 +39,8 @@ export const redis = {
         }
     },
 
-    async set(...args: any[]) { // eslint-disable-line @typescript-eslint/no-explicit-any
+    async set(...args: any[]) {
+        // eslint-disable-line @typescript-eslint/no-explicit-any
         if (!client) return;
         try {
             await (client as any).set(...args); // eslint-disable-line @typescript-eslint/no-explicit-any

@@ -8,7 +8,7 @@ import geoip from 'geoip-lite';
 
 const repo = new AnalyticsRepository();
 
-// Reuse the shared redisClient – same connection pool + lifecycle
+// Reuse the shared redisClient – same connection + lifecycle
 export const analyticsWorker = new Worker(
     'analytics',
     async (job) => {

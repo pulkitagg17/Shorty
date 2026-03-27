@@ -1,10 +1,10 @@
 import http from 'http';
 import { createApp } from './app';
 import { env } from './config/env';
-import { pool } from './infra/database';
 import { redisClient } from './infra/redis.client';
 import { closeAnalyticsWorker } from './analytics/analytics.worker';
 import './analytics/queue.monitor';
+import { prisma } from './infra/prisma';
 
 const app = createApp();
 const port = Number(env.PORT);
@@ -42,22 +42,22 @@ async function shutdown(signal: string) {
         try {
             await redisClient.quit();
             console.log('→ Redis connection closed');
-        } catch (err: any) {
-            console.log('→ Redis quit failed (non-critical):', err.message);
+        } catch (err: unknown) {
+            console.log('→ Redis quit failed (non-critical):', err);
         }
 
-        // 4. Close PostgreSQL pool
+        // 4. Close Prisma
         try {
-            await pool.end();
-            console.log('→ PostgreSQL pool ended');
-        } catch (err: any) {
-            console.log('→ PostgreSQL pool close failed:', err.message);
+            await prisma.$disconnect();
+            console.log('→ Prisma disconnected');
+        } catch (err: unknown) {
+            console.log('→ Prisma disconnect failed:', err);
         }
 
         clearTimeout(forceExit);
         console.log('✅ Graceful shutdown complete');
         process.exit(0);
-    } catch (err) {
+    } catch (err: unknown) {
         console.error('❌ Shutdown error', err);
         clearTimeout(forceExit);
         process.exit(1);

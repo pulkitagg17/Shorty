@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String        @id @default(uuid()) @db.Uuid
+  email              String        @db.VarChar(255)
+  passwordHash       String        @map("password_hash") @db.VarChar(255)
+  customAliasesUsed  Int           @default(0) @map("custom_aliases_used")
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamp()
+
+  urls               Url[]
+  sessions           AuthSession[]
+
+  @@unique([email], map: "users_email_lower_unique")
+  @@map("users")
+}
+
+model Url {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  shortCode    String    @unique @map("short_code") @db.VarChar(8)
+  longUrl      String    @map("long_url")
+  customAlias  String?   @map("custom_alias") @db.VarChar(20)
+  expiryAt     DateTime? @map("expiry_at") @db.Timestamp()
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamp()
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, customAlias], map: "unique_user_alias")
+  @@index([userId, createdAt])
+  @@index([expiryAt])
+  @@map("urls")
+}
+
+model AuthSession {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  expiresAt   DateTime @map("expires_at") @db.Timestamp()
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp()
+  lastUsedAt  DateTime @default(now()) @map("last_used_at") @db.Timestamp()
+  fingerprint String?
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("auth_sessions")
+}
+
+model BlacklistedUrl {
+  id        Int      @id @default(autoincrement())
+  pattern   String
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp()
+
+  @@map("blacklisted_urls")
+}
+
+model Analytics {
+  eventId    String   @id @default(uuid()) @map("event_id") @db.Uuid
+  shortCode  String   @map("short_code") @db.VarChar(8)
+  timestamp  DateTime @db.Timestamp()
+  ipHash     String   @map("ip_hash") @db.VarChar(64)
+  userAgent  String?  @map("user_agent") @db.VarChar(500)
+  referer    String?
+  country    String?  @db.Char(2)
+  deviceType String?  @map("device_type") @db.VarChar(10)
+  os         String?  @db.VarChar(50)
+  browser    String?  @db.VarChar(50)
+  isBot      Boolean? @map("is_bot")
+
+  @@map("analytics")
+}

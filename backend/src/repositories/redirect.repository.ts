@@ -1,19 +1,37 @@
-import { pool } from '../infra/database';
+import { prisma } from '../infra/prisma';
 
 export class RedirectRepository {
     async findByCustomAlias(alias: string) {
-        const result = await pool.query(
-            'SELECT long_url, expiry_at FROM urls WHERE custom_alias = $1',
-            [alias],
-        );
-        return result.rows[0] || null;
+        const row = await prisma.url.findFirst({
+            where: { customAlias: alias },
+            select: {
+                longUrl: true,
+                expiryAt: true,
+            },
+        });
+
+        if (!row) return null;
+
+        return {
+            long_url: row.longUrl,
+            expiry_at: row.expiryAt,
+        };
     }
 
     async findByShortCode(code: string) {
-        const result = await pool.query(
-            'SELECT long_url, expiry_at FROM urls WHERE short_code = $1',
-            [code],
-        );
-        return result.rows[0] || null;
+        const row = await prisma.url.findFirst({
+            where: { shortCode: code },
+            select: {
+                longUrl: true,
+                expiryAt: true,
+            },
+        });
+
+        if (!row) return null;
+
+        return {
+            long_url: row.longUrl,
+            expiry_at: row.expiryAt,
+        };
     }
 }
