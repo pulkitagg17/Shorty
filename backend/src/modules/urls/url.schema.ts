@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { URL_CONSTRAINTS } from '../../shared/constraints';
 
+function isValidDate(value: string) {
+    return !Number.isNaN(new Date(value).getTime());
+}
+
 export const createUrlSchema = z.object({
     longUrl: z.string().trim().min(1, 'longUrl is required'),
     customAlias: z
@@ -16,7 +20,12 @@ export const updateUrlSchema = z.object({
     longUrl: z.string().trim().min(1, 'longUrl is required').optional(),
     expiresAt: z
         .union([
-            z.string().datetime({ message: 'Invalid date format' }).transform((value) => new Date(value)),
+            z
+                .string()
+                .trim()
+                .min(1, 'Invalid date format')
+                .refine(isValidDate, 'Invalid date format')
+                .transform((value) => new Date(value)),
             z.null(),
         ])
         .optional(),

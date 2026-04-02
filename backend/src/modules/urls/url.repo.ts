@@ -17,6 +17,7 @@ export interface UrlListItem {
     longUrl: string;
     customAlias: string | null;
     createdAt: Date;
+    expiryAt: Date | null;
 }
 
 export interface UrlCacheTarget {
@@ -74,6 +75,7 @@ export function findUrlsByUserId(userId: string): Promise<UrlListItem[]> {
             longUrl: true,
             customAlias: true,
             createdAt: true,
+            expiryAt: true,
         },
     });
 }

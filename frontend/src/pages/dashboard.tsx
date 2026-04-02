@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useUrls } from "@/api/url.queries";
-import { formatDate, buildShortUrl, getStatus } from "@/lib/helper";
+import { formatDate, buildShortUrl, getStatus, getExpiryDetails } from "@/lib/helper";
 import { Link } from "react-router-dom";
 import { Copy, MoreHorizontal, BarChart2, Edit, ExternalLink, Plus, Search, Link2, Activity, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,10 +23,22 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 
+type StatusFilter = "All" | "Active" | "Deactivated";
+
 export default function Dashboard() {
     const { data, isLoading, error } = useUrls();
     const [copiedCode, setCopiedCode] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>("All");
+    const [now, setNow] = useState(() => Date.now());
+
+    useEffect(() => {
+        const timer = window.setInterval(() => {
+            setNow(Date.now());
+        }, 1000);
+
+        return () => window.clearInterval(timer);
+    }, []);
 
     const copyToClipboard = async (shortUrl: string, code: string) => {
         await navigator.clipboard.writeText(shortUrl);
@@ -35,24 +47,34 @@ export default function Dashboard() {
     };
 
     const stats = useMemo(() => {
-        if (!data) return { total: 0, active: 0, expired: 0 };
+        if (!data) return { total: 0, active: 0, deactivated: 0 };
         return {
             total: data.length,
-            active: data.filter(u => getStatus(u.expiresAt) === "Active").length,
-            expired: data.filter(u => getStatus(u.expiresAt) === "Expired").length
+            active: data.filter(u => getStatus(u.expiresAt, now) === "Active").length,
+            deactivated: data.filter(u => getStatus(u.expiresAt, now) === "Deactivated").length
         };
-    }, [data]);
+    }, [data, now]);
 
     const filteredData = useMemo(() => {
         if (!data) return [];
-        if (!searchTerm) return data;
+
+        const statusMatched = data.filter((url) => {
+            if (statusFilter === "All") {
+                return true;
+            }
+
+            return getStatus(url.expiresAt, now) === statusFilter;
+        });
+
+        if (!searchTerm) return statusMatched;
+
         const lowerTerm = searchTerm.toLowerCase();
-        return data.filter(u =>
+        return statusMatched.filter(u =>
             u.shortCode.toLowerCase().includes(lowerTerm) ||
             u.customAlias?.toLowerCase().includes(lowerTerm) ||
             u.longUrl.toLowerCase().includes(lowerTerm)
         );
-    }, [data, searchTerm]);
+    }, [data, now, searchTerm, statusFilter]);
 
     if (isLoading) return <div className="p-8 text-center text-muted-foreground animate-pulse">Loading workspace...</div>;
     if (error) return <div className="p-8 text-center text-destructive bg-destructive/10 rounded-lg border border-destructive/20">Failed to load URLs.</div>;
@@ -76,21 +98,43 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <StatsCard title="Total Links" value={stats.total} icon={Link2} color="text-blue-400" />
                 <StatsCard title="Active Links" value={stats.active} icon={Activity} color="text-emerald-400" />
-                <StatsCard title="Expired Links" value={stats.expired} icon={AlertCircle} color="text-amber-400" />
+                <StatsCard title="Deactivated Links" value={stats.deactivated} icon={AlertCircle} color="text-amber-400" />
             </div>
 
             {/* MAIN CONTENT AREA */}
             <Card className="border-border bg-card/50 backdrop-blur-xl shadow-inner shadow-white/5 overflow-hidden">
                 <div className="p-6 border-b border-border flex flex-col md:flex-row justify-between items-center gap-4">
-                    <h2 className="text-lg font-semibold text-card-foreground">Your Links</h2>
-                    <div className="relative w-full md:w-72">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search links..."
-                            className="pl-9 bg-background/20 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/50"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+                    <div className="flex flex-col gap-3 w-full">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <h2 className="text-lg font-semibold text-card-foreground">Your Links</h2>
+                            <div className="relative w-full md:w-72">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search links..."
+                                    className="pl-9 bg-background/20 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary/50"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {(["All", "Active", "Deactivated"] as StatusFilter[]).map((filter) => {
+                                const active = statusFilter === filter;
+
+                                return (
+                                    <Button
+                                        key={filter}
+                                        type="button"
+                                        variant={active ? "default" : "outline"}
+                                        size="sm"
+                                        className={active ? "" : "bg-background/20"}
+                                        onClick={() => setStatusFilter(filter)}
+                                    >
+                                        {filter}
+                                    </Button>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
 
@@ -123,7 +167,10 @@ export default function Dashboard() {
                                 <AnimatePresence initial={false}>
                                     {filteredData.map((url) => {
                                         const shortUrl = buildShortUrl(url);
-                                        const isActive = getStatus(url.expiresAt) === "Active";
+                                        const status = getStatus(url.expiresAt, now);
+                                        const isActive = status === "Active";
+                                        const canEdit = isActive;
+                                        const expiry = getExpiryDetails(url.expiresAt, now);
 
                                         return (
                                             <motion.tr
@@ -170,8 +217,12 @@ export default function Dashboard() {
                                                         : "bg-destructive/10 text-destructive border-destructive/20"
                                                         } text-xs font-normal`}>
                                                         <span className={`mr-1.5 h-1.5 w-1.5 rounded-full ${isActive ? 'bg-emerald-400' : 'bg-destructive'} animate-pulse`}></span>
-                                                        {getStatus(url.expiresAt)}
+                                                        {status}
                                                     </Badge>
+                                                    <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                                                        <div>{expiry.exact}</div>
+                                                        <div>{expiry.relative}</div>
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="text-right align-top py-4">
                                                     <DropdownMenu>
@@ -186,11 +237,17 @@ export default function Dashboard() {
                                                                     <BarChart2 className="h-4 w-4" /> Analytics
                                                                 </Link>
                                                             </DropdownMenuItem>
-                                                            <DropdownMenuItem asChild>
-                                                                <Link to={`/urls/${url.shortCode}/edit`} className="cursor-pointer flex items-center gap-2 hover:bg-muted focus:bg-muted">
-                                                                    <Edit className="h-4 w-4" /> Edit
-                                                                </Link>
-                                                            </DropdownMenuItem>
+                                                            {canEdit ? (
+                                                                <DropdownMenuItem asChild>
+                                                                    <Link to={`/urls/${url.shortCode}/edit`} className="cursor-pointer flex items-center gap-2 hover:bg-muted focus:bg-muted">
+                                                                        <Edit className="h-4 w-4" /> Edit
+                                                                    </Link>
+                                                                </DropdownMenuItem>
+                                                            ) : (
+                                                                <DropdownMenuItem disabled className="flex items-center gap-2 opacity-50">
+                                                                    <Edit className="h-4 w-4" /> Edit disabled
+                                                                </DropdownMenuItem>
+                                                            )}
                                                             <DropdownMenuItem asChild>
                                                                 <a href={shortUrl} target="_blank" rel="noreferrer" className="cursor-pointer flex items-center gap-2 hover:bg-muted focus:bg-muted">
                                                                     <ExternalLink className="h-4 w-4" /> Visit

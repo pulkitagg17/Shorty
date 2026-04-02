@@ -32,6 +32,14 @@ interface UrlApiRecord {
     expiryAt: Date | null;
 }
 
+interface UrlListApiRecord {
+    shortCode: string;
+    longUrl: string;
+    customAlias: string | null;
+    createdAt: Date;
+    expiryAt: Date | null;
+}
+
 function validateExpiryAt(expiryAt?: Date | null) {
     if (!(expiryAt instanceof Date)) {
         return;
@@ -120,7 +128,7 @@ export async function createUrlForUser(userId: string, longUrl: string, customAl
         ? await createUrl({
             id: uuidv4(),
             userId,
-            shortCode: customAlias,
+            shortCode: generateCode(),
             longUrl: normalizedLongUrl,
             customAlias,
         })
@@ -136,7 +144,15 @@ export async function createUrlForUser(userId: string, longUrl: string, customAl
 }
 
 export function listUserUrls(userId: string) {
-    return findUrlsByUserId(userId);
+    return findUrlsByUserId(userId).then((urls) =>
+        urls.map((url: UrlListApiRecord) => ({
+            shortCode: url.shortCode,
+            longUrl: url.longUrl,
+            customAlias: url.customAlias,
+            createdAt: url.createdAt,
+            expiresAt: url.expiryAt,
+        })),
+    );
 }
 
 export async function getUserUrl(code: string, userId: string) {

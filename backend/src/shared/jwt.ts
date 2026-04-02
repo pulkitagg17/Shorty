@@ -20,7 +20,21 @@ export function signJwt(
 }
 
 export function verifyJwt(token: string): JwtPayload {
-    const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+    let decoded: JwtPayload;
+
+    try {
+        decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+    } catch (error) {
+        if (error instanceof jwt.TokenExpiredError) {
+            throw new AuthError('Session expired');
+        }
+
+        if (error instanceof jwt.JsonWebTokenError) {
+            throw new AuthError('Invalid token');
+        }
+
+        throw error;
+    }
 
     if (!decoded.userId || !decoded.sessionId) {
         throw new AuthError('Invalid token');

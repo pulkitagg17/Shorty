@@ -2,6 +2,7 @@ import { useParams, Link } from "react-router-dom";
 import { useAnalytics } from "@/api/analytics.queries";
 import { DeviceChart } from "@/components/DeviceChart";
 import { BACKEND_URL } from "@/config/env";
+import { getStatus } from "@/lib/helper";
 import {
     Card,
     CardContent,
@@ -30,9 +31,8 @@ export default function AnalyticsPage() {
     if (error || !data) return <div className="p-6 text-red-500">Analytics not found</div>;
 
     const shortLink = `${BACKEND_URL}/api/${data.url.customAlias || data.url.shortCode}`;
-    const devices = Object.entries(data.devices).map(
-        ([type, count]) => ({ type, count })
-    );
+    const devices = Object.entries(data.devices).map(([type, count]) => ({ type, count }));
+    const status = getStatus(data.url.expiresAt);
 
     return (
         <div className="space-y-6">
@@ -46,7 +46,9 @@ export default function AnalyticsPage() {
                     <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
                     <div className="flex items-center text-sm text-muted-foreground gap-2">
                         <span>{data.url.customAlias || data.url.shortCode}</span>
-                        <span>â€¢</span>
+                        <span>•</span>
+                        <span>{status}</span>
+                        <span>•</span>
                         <a href={shortLink} target="_blank" rel="noreferrer" className="flex items-center hover:underline">
                             Visit Short Link <ExternalLink className="ml-1 h-3 w-3" />
                         </a>
@@ -54,13 +56,10 @@ export default function AnalyticsPage() {
                 </div>
             </div>
 
-            {/* OVERVIEW CARDS */}
             <div className="grid gap-4 md:grid-cols-3">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Total Clicks
-                        </CardTitle>
+                        <CardTitle className="text-sm font-medium">Total Clicks</CardTitle>
                         <MousePointerClick className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -69,37 +68,28 @@ export default function AnalyticsPage() {
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Last Accessed
-                        </CardTitle>
+                        <CardTitle className="text-sm font-medium">Last Accessed</CardTitle>
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-sm">
-                            {data.lastAccessed
-                                ? new Date(data.lastAccessed).toLocaleString()
-                                : "Never"}
+                            {data.lastAccessed ? new Date(data.lastAccessed).toLocaleString() : "Never"}
                         </div>
                     </CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Bot Traffic
-                        </CardTitle>
+                        <CardTitle className="text-sm font-medium">Bot Traffic</CardTitle>
                         <User className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{data.bots}</div>
-                        <p className="text-xs text-muted-foreground">
-                            Identified automated requests
-                        </p>
+                        <p className="text-xs text-muted-foreground">Identified automated requests</p>
                     </CardContent>
                 </Card>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                {/* DEVICE CHART */}
                 <Card className="col-span-3">
                     <CardHeader>
                         <CardTitle>Device Distribution</CardTitle>
@@ -109,7 +99,6 @@ export default function AnalyticsPage() {
                     </CardContent>
                 </Card>
 
-                {/* OPERATING SYSTEMS */}
                 <Card className="col-span-4">
                     <CardHeader>
                         <CardTitle>Operating Systems</CardTitle>
@@ -129,10 +118,10 @@ export default function AnalyticsPage() {
                                         <TableCell colSpan={2} className="text-center">No data</TableCell>
                                     </TableRow>
                                 ) : (
-                                    data.osStats.map(o => (
-                                        <TableRow key={o.os}>
-                                            <TableCell>{o.os}</TableCell>
-                                            <TableCell className="text-right">{o.count}</TableCell>
+                                    data.osStats.map((item) => (
+                                        <TableRow key={item.os}>
+                                            <TableCell>{item.os}</TableCell>
+                                            <TableCell className="text-right">{item.count}</TableCell>
                                         </TableRow>
                                     ))
                                 )}
@@ -143,7 +132,6 @@ export default function AnalyticsPage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-                {/* BROWSERS */}
                 <Card>
                     <CardHeader>
                         <CardTitle>Browsers</CardTitle>
@@ -162,10 +150,10 @@ export default function AnalyticsPage() {
                                         <TableCell colSpan={2} className="text-center">No data</TableCell>
                                     </TableRow>
                                 ) : (
-                                    data.browserStats.map(b => (
-                                        <TableRow key={b.browser}>
-                                            <TableCell>{b.browser}</TableCell>
-                                            <TableCell className="text-right">{b.count}</TableCell>
+                                    data.browserStats.map((item) => (
+                                        <TableRow key={item.browser}>
+                                            <TableCell>{item.browser}</TableCell>
+                                            <TableCell className="text-right">{item.count}</TableCell>
                                         </TableRow>
                                     ))
                                 )}
@@ -174,7 +162,6 @@ export default function AnalyticsPage() {
                     </CardContent>
                 </Card>
 
-                {/* COUNTRIES */}
                 <Card>
                     <CardHeader>
                         <CardTitle>Countries</CardTitle>
@@ -193,10 +180,10 @@ export default function AnalyticsPage() {
                                         <TableCell colSpan={2} className="text-center">No data</TableCell>
                                     </TableRow>
                                 ) : (
-                                    data.countries.map(c => (
-                                        <TableRow key={c.code}>
-                                            <TableCell>{c.code}</TableCell>
-                                            <TableCell className="text-right">{c.count}</TableCell>
+                                    data.countries.map((item) => (
+                                        <TableRow key={item.code}>
+                                            <TableCell>{item.code}</TableCell>
+                                            <TableCell className="text-right">{item.count}</TableCell>
                                         </TableRow>
                                     ))
                                 )}

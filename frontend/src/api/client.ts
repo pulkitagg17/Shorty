@@ -38,6 +38,10 @@ export async function apiFetch<T>(
             body = await res.json();
         } catch {}
 
+        if (res.status === 401) {
+            clearAuthToken();
+        }
+
         throw {
             status: res.status,
             error: body.error,

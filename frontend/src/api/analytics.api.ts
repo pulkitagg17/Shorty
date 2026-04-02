@@ -12,6 +12,7 @@ export type AnalyticsResponse = {
         shortCode: string;
         customAlias: string | null;
         longUrl: string;
+        expiresAt?: string | null;
     };
 };
 
