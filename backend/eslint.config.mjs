@@ -21,7 +21,7 @@ export default [
         },
         rules: {
             /* =====================
-               Code Quality
+            Code Quality
             ===================== */
             'no-console': 'off', // backend needs logs
             'no-debugger': 'error',
@@ -39,14 +39,14 @@ export default [
             '@typescript-eslint/ban-ts-comment': 'warn',
 
             /* =====================
-               Safety & Correctness
+            Safety & Correctness
             ===================== */
             '@typescript-eslint/no-floating-promises': 'error',
             '@typescript-eslint/await-thenable': 'error',
             '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
 
             /* =====================
-               Style (handled mostly by Prettier)
+            Style (handled mostly by Prettier)
             ===================== */
             semi: ['error', 'always'],
             quotes: ['error', 'single'],

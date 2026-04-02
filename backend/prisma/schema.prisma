@@ -8,64 +8,78 @@ datasource db {
 }
 
 model User {
-  id                 String        @id @default(uuid()) @db.Uuid
-  email              String        @db.VarChar(255)
-  passwordHash       String        @map("password_hash") @db.VarChar(255)
-  customAliasesUsed  Int           @default(0) @map("custom_aliases_used")
-  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamp()
+  id           String        @id @default(uuid()) @db.Uuid
+  email        String        @db.VarChar(255)
+  passwordHash String        @map("password_hash") @db.VarChar(255)
+  status       String        @default("active") @db.VarChar(20)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamp()
+  updatedAt    DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
 
-  urls               Url[]
-  sessions           AuthSession[]
+  urls         Url[]
+  sessions     AuthSession[]
 
   @@unique([email], map: "users_email_lower_unique")
+  @@index([status])
   @@map("users")
 }
 
 model Url {
-  id           String    @id @default(uuid()) @db.Uuid
-  userId       String    @map("user_id") @db.Uuid
-  shortCode    String    @unique @map("short_code") @db.VarChar(8)
-  longUrl      String    @map("long_url")
-  customAlias  String?   @map("custom_alias") @db.VarChar(20)
-  expiryAt     DateTime? @map("expiry_at") @db.Timestamp()
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamp()
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
+  id          String      @id @default(uuid()) @db.Uuid
+  userId      String      @map("user_id") @db.Uuid
+  shortCode   String      @unique @map("short_code") @db.VarChar(8)
+  longUrl     String      @map("long_url")
+  customAlias String?     @unique @map("custom_alias") @db.VarChar(20)
+  status      String      @default("active") @db.VarChar(20)
+  expiryAt    DateTime?   @map("expiry_at") @db.Timestamp()
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamp()
+  updatedAt   DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
+  deletedAt   DateTime?   @map("deleted_at") @db.Timestamp()
 
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analytics   Analytics[]
 
-  @@unique([userId, customAlias], map: "unique_user_alias")
   @@index([userId, createdAt])
+  @@index([status])
   @@index([expiryAt])
+  @@index([deletedAt])
   @@map("urls")
 }
 
 model AuthSession {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @map("user_id") @db.Uuid
-  expiresAt   DateTime @map("expires_at") @db.Timestamp()
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp()
-  lastUsedAt  DateTime @default(now()) @map("last_used_at") @db.Timestamp()
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  expiresAt  DateTime  @map("expires_at") @db.Timestamp()
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp()
+  lastUsedAt DateTime  @default(now()) @map("last_used_at") @db.Timestamp()
   fingerprint String?
+  revoked    Boolean   @default(false)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamp()
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
+  @@index([revoked])
   @@map("auth_sessions")
 }
 
-model BlacklistedUrl {
-  id        Int      @id @default(autoincrement())
-  pattern   String
-  reason    String?
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp()
+model BlacklistedRule {
+  id          Int      @id @default(autoincrement())
+  pattern     String
+  patternType String   @default("domain") @map("pattern_type") @db.VarChar(20)
+  reason      String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp()
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp()
 
+  @@index([isActive])
   @@map("blacklisted_urls")
 }
 
 model Analytics {
   eventId    String   @id @default(uuid()) @map("event_id") @db.Uuid
-  shortCode  String   @map("short_code") @db.VarChar(8)
+  urlId      String   @map("url_id") @db.Uuid
+  shortCode  String   @map("short_code") @db.VarChar(20)
   timestamp  DateTime @db.Timestamp()
   ipHash     String   @map("ip_hash") @db.VarChar(64)
   userAgent  String?  @map("user_agent") @db.VarChar(500)
@@ -76,5 +90,9 @@ model Analytics {
   browser    String?  @db.VarChar(50)
   isBot      Boolean? @map("is_bot")
 
+  url        Url      @relation(fields: [urlId], references: [id], onDelete: Cascade)
+
+  @@index([urlId, timestamp])
+  @@index([shortCode])
   @@map("analytics")
 }

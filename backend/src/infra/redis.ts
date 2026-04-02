@@ -1,60 +1,109 @@
 import Redis from 'ioredis';
+import { logger } from '../app/logger';
+import { env } from './env';
 
-const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+const redisOptions = {
+    lazyConnect: true,
+    connectTimeout: 10000,
+    enableOfflineQueue: false,
+    maxRetriesPerRequest: null,
+};
 
-let client: Redis | null = null;
+export const redisClient = new Redis(env.REDIS_URL, redisOptions);
 
-try {
-    const r = new Redis(redisUrl, {
-        connectTimeout: 50,
-        enableOfflineQueue: false,
-        maxRetriesPerRequest: 1,
-        lazyConnect: true,
+redisClient.on('error', (error) => {
+    logger.warn('Redis error', {
+        component: 'redis',
+        error: error.message,
     });
+});
 
-    r.on('error', () => {
-        console.warn('[REDIS] connection error – cache disabled');
-    });
+function toCacheValue(value: string | number | boolean | Buffer | object) {
+    if (typeof value === 'object' && !Buffer.isBuffer(value)) {
+        return JSON.stringify(value);
+    }
 
-    r.connect()
-        .then(() => {
-            console.log('[REDIS] connected');
-            client = r;
-        })
-        .catch(() => {
-            console.warn('[REDIS] unavailable at startup – running without cache');
-            client = null;
-        });
-} catch {
-    client = null;
+    return String(value);
 }
 
-export const redis = {
+function toKeyList(key: string | string[]) {
+    return Array.isArray(key) ? key : [key];
+}
+
+export async function connectRedis() {
+    if (redisClient.status === 'ready' || redisClient.status === 'connecting') {
+        return;
+    }
+
+    try {
+        await redisClient.connect();
+        logger.info('Redis ready', { component: 'redis' });
+    } catch (error) {
+        logger.warn('Redis unavailable during startup', {
+            component: 'redis',
+            error: String(error),
+        });
+    }
+}
+
+export async function closeRedis() {
+    if (redisClient.status === 'end') {
+        return;
+    }
+
+    try {
+        await redisClient.quit();
+    } catch (error) {
+        logger.warn('Redis quit failed', {
+            component: 'redis',
+            error: String(error),
+        });
+    }
+}
+
+export const cache = {
     async get(key: string) {
-        if (!client) return null;
         try {
-            return await client.get(key);
+            return await redisClient.get(key);
         } catch {
             return null;
         }
     },
 
-    async set(...args: any[]) {
-        // eslint-disable-line @typescript-eslint/no-explicit-any
-        if (!client) return;
+    async set(key: string, value: string | number | boolean | Buffer | object, ttlSeconds?: number) {
         try {
-            await (client as any).set(...args); // eslint-disable-line @typescript-eslint/no-explicit-any
+            const payload = toCacheValue(value);
+
+            if (ttlSeconds) {
+                await redisClient.set(key, payload, 'EX', ttlSeconds);
+                return;
+            }
+
+            await redisClient.set(key, payload);
         } catch {
-            // intentionally ignored
+            logger.debug('Cache write skipped', { component: 'redis', key });
         }
     },
 
-    async del(key: string) {
-        if (!client) return;
+    async del(key: string | string[]) {
+        const keys = toKeyList(key);
+
+        if (keys.length === 0) {
+            return;
+        }
+
         try {
-            await client.del(key);
+            await redisClient.del(...keys);
         } catch {
-            // intentionally ignored
+            logger.debug('Cache delete skipped', { component: 'redis', key: keys });
+        }
+    },
+
+    async exists(key: string) {
+        try {
+            return (await redisClient.exists(key)) === 1;
+        } catch {
+            return false;
         }
     },
 };

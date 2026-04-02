@@ -9,14 +9,14 @@ function createClient() {
         log:
             process.env.NODE_ENV === 'development'
                 ? [
-                      { emit: 'event', level: 'query' },
-                      { emit: 'stdout', level: 'warn' },
-                      { emit: 'stdout', level: 'error' },
-                  ]
+                    { emit: 'event', level: 'query' },
+                    { emit: 'stdout', level: 'warn' },
+                    { emit: 'stdout', level: 'error' },
+                ]
                 : [
-                      { emit: 'stdout', level: 'warn' },
-                      { emit: 'stdout', level: 'error' },
-                  ],
+                    { emit: 'stdout', level: 'warn' },
+                    { emit: 'stdout', level: 'error' },
+                ],
         errorFormat: 'minimal',
     });
 

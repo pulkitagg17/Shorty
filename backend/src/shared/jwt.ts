@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
-import { authConfig } from '../config/auth';
-import { AuthError } from './errors';
+import { env } from '../infra/env';
+import { AuthError } from '../app/errors';
 
 export interface JwtPayload {
     userId: string;
@@ -13,28 +13,18 @@ export function signJwt(
     payload: Omit<JwtPayload, 'iat' | 'exp'>,
     options?: jwt.SignOptions,
 ): string {
-    return jwt.sign(payload, authConfig.jwtSecret, {
-        expiresIn: authConfig.jwtExpiresInSeconds,
+    return jwt.sign(payload, env.JWT_SECRET, {
+        expiresIn: env.JWT_EXPIRES_IN_SECONDS,
         ...options,
     });
 }
 
 export function verifyJwt(token: string): JwtPayload {
-    try {
-        const decoded = jwt.verify(token, authConfig.jwtSecret) as JwtPayload;
+    const decoded = jwt.verify(token, env.JWT_SECRET) as JwtPayload;
 
-        if (!decoded.userId || !decoded.sessionId) {
-            throw new AuthError('Invalid token payload');
-        }
-
-        return decoded;
-    } catch (err) {
-        if (err instanceof jwt.TokenExpiredError) {
-            throw new AuthError('Token has expired');
-        }
-        if (err instanceof jwt.JsonWebTokenError) {
-            throw new AuthError('Invalid token');
-        }
-        throw new AuthError('Authentication failed');
+    if (!decoded.userId || !decoded.sessionId) {
+        throw new AuthError('Invalid token');
     }
+
+    return decoded;
 }

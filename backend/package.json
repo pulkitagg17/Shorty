@@ -4,7 +4,7 @@
     "main": "server.js",
     "scripts": {
         "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-        "worker": "ts-node src/analytics/analytics.worker.ts",
+        "worker": "ts-node src/worker.ts",
         "build": "tsc",
         "lint": "eslint .",
         "typecheck": "tsc --noEmit",
@@ -24,7 +24,6 @@
         "@prisma/client": "^6.19.2",
         "bcrypt": "^6.0.0",
         "bullmq": "^5.67.0",
-        "cookie-parser": "^1.4.7",
         "cors": "^2.8.6",
         "dotenv": "^17.3.1",
         "express": "^5.2.1",
@@ -42,7 +41,6 @@
     "devDependencies": {
         "@eslint/js": "^9.39.2",
         "@types/bcrypt": "^6.0.0",
-        "@types/cookie-parser": "^1.4.10",
         "@types/cors": "^2.8.19",
         "@types/express": "^5.0.6",
         "@types/geoip-lite": "^1.4.4",
