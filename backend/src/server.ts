@@ -3,8 +3,8 @@ import { createApp } from './app';
 import { env } from './config/env';
 import { redisClient } from './infra/redis.client';
 import { closeAnalyticsWorker } from './analytics/analytics.worker';
-import './analytics/queue.monitor';
 import { prisma } from './infra/prisma';
+import './analytics/queue.monitor';
 
 const app = createApp();
 const port = Number(env.PORT);
