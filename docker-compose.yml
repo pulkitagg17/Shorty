@@ -1,0 +1,108 @@
+version: '3.9'
+
+services:
+  # ========================================================================
+  # PostgreSQL Database
+  # ========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: shorty-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: shorty
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shorty-network
+
+  # ========================================================================
+  # Redis Cache & Message Queue
+  # ========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: shorty-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shorty-network
+
+  # ========================================================================
+  # Node.js API Server
+  # ========================================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shorty-api
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/shorty
+      - REDIS_URL=redis://redis:6379
+      - CORS_ORIGIN=http://localhost:5173
+      - JWT_SECRET=dev-secret-key-change-in-production
+      - JWT_EXPIRES_IN_SECONDS=900
+      - SESSION_EXPIRES_IN_SECONDS=604800
+      - IP_HASH_SALT=dev-salt-change-in-production
+    ports:
+      - '3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/src:/app/src
+    command: npm run dev
+    networks:
+      - shorty-network
+    restart: on-failure:3
+
+  # ========================================================================
+  # Analytics Worker (BullMQ Consumer)
+  # ========================================================================
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shorty-worker
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/shorty
+      - REDIS_URL=redis://redis:6379
+      - IP_HASH_SALT=dev-salt-change-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend/src:/app/src
+    command: npm run worker
+    networks:
+      - shorty-network
+    restart: on-failure:3
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  shorty-network:
+    driver: bridge
